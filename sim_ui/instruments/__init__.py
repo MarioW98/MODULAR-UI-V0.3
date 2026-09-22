@@ -1,14 +1,31 @@
-from .base import BaseInstrument, UnitButtonsMixin, PlaceholderInstrument
+from .base import BaseInstrument, UnitButtonsMixin, PlaceholderInstrument, TurnTargetMixin, ColorSelectorMixin
 from .circular import CircularGauge
-from .specific import (
-    AirspeedIndicator, Altimeter, DigitalAltimeter,
-    AttitudeIndicator, AttitudeIndicatorFull, AttitudeIndicatorSquare,
-    RPMGauge, OilTempGauge, HeadingIndicator, DigitalVSI
-)
+# from .specific import (
+#     AirspeedIndicator, Altimeter, DigitalAltimeter,
+#     AttitudeIndicator, AttitudeIndicatorFull, AttitudeIndicatorSquare,
+#     RPMGauge, OilTempGauge, HeadingIndicator, DigitalVSI, TurnCoordinator,
+# )
+from .gauges import (
+            AirspeedIndicator, Altimeter, RPMGauge, OilTempGauge,
+            HeadingIndicator,TurnCoordinator,
+            )
+from .digital import (
+            DigitalAltimeter, DigitalVSI
+        )
+from .attitude import (
+            AttitudeIndicator, AttitudeIndicatorFull, AttitudeIndicatorSquare
+        )
+
 from .professional import (
     AirspeedIndicatorProfessional,
     HeadingIndicatorProfessional,
     AltimeterProfessional,
-    VSIGaugeProfessional
+    VSIGaugeProfessional, TurnCoordinatorProfessional,
 )
+from .advance_instr import AttitudeAdvance
+from .comfort_instr import (
+    AirspeedComfort, AltimeterComfort, VSIComfort, 
+    HeadingComfort, TurnCoordinatorComfort,
+)
+
 from .factory import InstrumentFactory

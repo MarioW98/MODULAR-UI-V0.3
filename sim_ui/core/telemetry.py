@@ -13,6 +13,7 @@ class TelemetryData:
     heading: float = 0.0
     pitch: float = 0.0
     roll: float = 0.0
+    turn_rate: float = 0.0 
     manifold_pressure: float = 0.0
     fuel_flow: float = 0.0
     vertical_speed: float = 0.0
@@ -32,6 +33,7 @@ class MockTelemetryAdapter(TelemetryAdapter):
         self._timer.timeout.connect(self._tick)
         self._time = 0.0
         self._interval_ms = 50  # Default: 20 FPS
+        self._prev_heading = 0.0
 
     def start(self, interval_ms: int = None):
         if interval_ms is not None:
@@ -49,20 +51,39 @@ class MockTelemetryAdapter(TelemetryAdapter):
             self._timer.start(self._interval_ms)
 
     def _tick(self):
-        self._time += self._interval_ms / 1000.0
+        dt = self._interval_ms / 1000.0
+        self._time += dt
         t = self._time
+
+        # Rate di virata variabile: oscilla tra -5 e +5 °/sec
+        # L'aereo vira a destra, poi dritto, poi a sinistra
+        heading_rate = 5.0 * math.sin(t * 0.25)
+
+        # Heading calcolato come integrale del rate
+        heading = (self._prev_heading + heading_rate * dt) % 360
+
+        # Turn rate effettivo (derivata dell'heading con gestione wrap-around)
+        delta_heading = heading - self._prev_heading
+        if delta_heading > 180:
+            delta_heading -= 360
+        elif delta_heading < -180:
+            delta_heading += 360
+        turn_rate = delta_heading / dt if dt > 0 else 0.0
+
+        self._prev_heading = heading
+
         self.telemetry_updated.emit(TelemetryData(
             airspeed=120 + 35 * math.sin(t * 0.4),
             altitude=3500 + 800 * math.sin(t * 0.25),
             rpm=2200 + 350 * math.sin(t * 0.6),
             oil_temp=85 + 15 * math.sin(t * 0.15),
-            heading=(t * 8) % 360,
+            heading=heading,
             pitch=55 * math.sin(t * 0.35),
             roll=18 * math.sin(t * 0.5),
+            turn_rate=turn_rate,
             manifold_pressure=22 + 4 * math.sin(t * 0.3),
             fuel_flow=8 + 2 * math.sin(t * 0.2),
-            vertical_speed=500 * math.sin(t * 0.15),
-            
+            vertical_speed=1200 * math.sin(t * 0.15),
         ))
 
 

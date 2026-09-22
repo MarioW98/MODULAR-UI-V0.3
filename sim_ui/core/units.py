@@ -25,4 +25,15 @@ ALTITUDE_UNITS = [
 VSI_UNITS = [
     UnitDefinition("fpm", "FT/MIN", 1.0, 0, 500.0),
     UnitDefinition("mps", "M/S", 0.00508, 1, 2.0),
+    UnitDefinition("fps", "FT/S", 0.0166667, 1, 5.0),
 ]
+
+def unit_index(units: list, key: str) -> int:
+    """
+    Restituisce l'indice dell'unità il cui unit_id o label corrisponde a `key`.
+    Ritorna 0 se non trovata.
+    """
+    for i, u in enumerate(units):
+        if u.unit_id == key or u.label == key:
+            return i
+    return 0

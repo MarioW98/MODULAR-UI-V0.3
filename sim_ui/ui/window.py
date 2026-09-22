@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         self._registry = build_default_registry()
         self._theme_registry = build_default_themes()
         self._current_theme = self._theme_registry.default()
+
         
 
         # Stato OpenGL
@@ -40,7 +41,7 @@ class MainWindow(QMainWindow):
         # Scena
         self._scene = InstrumentScene(self)
         self._scene.setSceneRect(0, 0, 1600, 900)
-        self._scene.setBackgroundBrush(QBrush(QColor(15,18,25)))
+        # self._scene.setBackgroundBrush(QBrush(QColor(15,18,25)))
         self._scene.set_grid_size(self._grid_size)
         self._scene.selectionChanged.connect(self._on_selection_changed)
 
@@ -75,6 +76,8 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._status_label)
         self._update_status_bar()
         self._update_toolbar_state()
+
+        self._apply_theme(self._current_theme.theme_id)
 
         # FPS tracking
         self._fps_timer = QTimer(self)
@@ -401,12 +404,15 @@ class MainWindow(QMainWindow):
         theme = self._theme_registry.get(theme_id)
         if theme is None:
             return
-
         self._current_theme = theme
 
-        # Aggiorna tutti gli strumenti
+        # Applica il tema a tutti gli strumenti
         for item in self._all_instruments():
             item.set_theme(theme)
+
+        # Applica il tema alla scena (sfondo + griglia)
+        self._scene.setBackgroundBrush(QBrush(theme.scene_background))
+        self._scene.set_grid_color(theme.grid_color)
 
         # Aggiorna checkmark nel menu
         for tid, act in self._theme_actions.items():
@@ -415,7 +421,6 @@ class MainWindow(QMainWindow):
         # Forza ridisegno
         self._scene.invalidate()
         self._view.viewport().update()
-
         self.statusBar().showMessage(f"Tema: {theme.display_name}", 3000)
 
 
@@ -633,20 +638,41 @@ class MainWindow(QMainWindow):
     # =========================================================================
 
     def _serialize(self):
+        instruments = []
+        for it in self._all_instruments():
+            entry = {
+                "instance_id": it.instance_id,
+                "type_id": it.prototype.type_id,
+                "x": it.pos().x(),
+                "y": it.pos().y(),
+                "rotation": it.rotation(),
+                "scale": it.scale(),
+                "z": it.zValue(),
+            }
+            if hasattr(it, "save_state"):
+                state = it.save_state()
+                if state:
+                    entry["state"] = state
+            instruments.append(entry)
         return {
             "schema_version": LAYOUT_SCHEMA_VERSION,
             "snap_enabled": self._snap_enabled,
             "grid_size": self._grid_size,
-            "instruments": [{
-                "instance_id": it.instance_id, "type_id": it.prototype.type_id,
-                "x": it.pos().x(), "y": it.pos().y(),
-                "rotation": it.rotation(), "scale": it.scale(), "z": it.zValue(),
-            } for it in self._all_instruments()],
+            "theme_id": self._current_theme.theme_id if self._current_theme else "base",  # ← NUOVA
+            "instruments": instruments,
         }
-
+    
     def _deserialize(self, data):
         if data.get("schema_version", 0) > LAYOUT_SCHEMA_VERSION: return False
         self._clear_all(); self._snap_enabled = False
+
+        # Ripristina il tema salvato
+        theme_id = data.get("theme_id")
+        if theme_id:
+            theme = self._theme_registry.get(theme_id)
+            if theme:
+                self._current_theme = theme
+
         for inst in data.get("instruments", []):
             proto = self._registry.get(inst.get("type_id"))
             if not proto: continue
@@ -658,16 +684,26 @@ class MainWindow(QMainWindow):
             item.setScale(inst.get("scale",1.0))
             item.setZValue(inst.get("z",0))
             item.set_grid_size(self._grid_size)
+            state = inst.get("state")
+            if state and hasattr(item, "restore_state"):
+                item.restore_state(state)
             self._scene.addItem(item)
             if self._current_theme:
                 item.set_theme(self._current_theme)
+
         self._snap_enabled = data.get("snap_enabled", False)
         self._grid_size = data.get("grid_size", DEFAULT_GRID_SIZE)
         self._scene.set_grid_size(self._grid_size)
         self.set_snap(self._snap_enabled)
+
+        # Applica il tema a scena, griglia e checkmark menu
+        if theme_id:
+            self._apply_theme(theme_id)
+
         self._update_status_bar()
         return True
 
+    
     def _save_layout(self):
         fp, _ = QFileDialog.getSaveFileName(self, "Salva layout", "", "JSON (*.json)")
         if not fp: return

@@ -7,9 +7,9 @@ from PySide6.QtGui import (
     QRadialGradient, QLinearGradient,
 )
 
-from .base import BaseInstrument, UnitButtonsMixin
+from .base import BaseInstrument, UnitButtonsMixin, TurnTargetMixin
 from ..core.telemetry import TelemetryData
-from ..core.units import AIRSPEED_UNITS, ALTITUDE_UNITS, VSI_UNITS
+from ..core.units import AIRSPEED_UNITS, ALTITUDE_UNITS, VSI_UNITS, unit_index
 
 
 # =============================================================================
@@ -40,7 +40,7 @@ class AirspeedIndicatorProfessional(UnitButtonsMixin, BaseInstrument):
         self._minor_per_major = 4
         self._unit_label = "KNOTS"
 
-        self.init_units(AIRSPEED_UNITS, 0)
+        self.init_units(AIRSPEED_UNITS, unit_index(AIRSPEED_UNITS, "M/S"))
         self._apply_unit()
 
     # =========================================================================
@@ -458,7 +458,7 @@ class AltimeterProfessional(UnitButtonsMixin, BaseInstrument):
     def __init__(self, prototype, parent=None):
         super().__init__(prototype, parent)
         self._altitude = 0.0
-        self.init_units(ALTITUDE_UNITS, 0)
+        self.init_units(ALTITUDE_UNITS, unit_index(ALTITUDE_UNITS, "METERS"))
 
     def update_data(self, data: TelemetryData):
         self._altitude = max(0.0, data.altitude)
@@ -703,7 +703,7 @@ class VSIGaugeProfessional(UnitButtonsMixin, BaseInstrument):
         self._label_scale = 100.0     # divisore per etichette (500→"5")
         self._unit_label = "FT/MIN"
 
-        self.init_units(VSI_UNITS, 0)
+        self.init_units(VSI_UNITS, unit_index(VSI_UNITS, "M/S"))
         self._apply_unit()
 
     # =========================================================================
@@ -769,19 +769,23 @@ class VSIGaugeProfessional(UnitButtonsMixin, BaseInstrument):
         p.setBrush(QColor(10, 10, 12))
         p.drawEllipse(QPointF(cx, cy), dial_r, dial_r)
 
-        # --- Tacche e numeri ---
+        # =====================================================================
+        # TACCHE E NUMERI
+        # =====================================================================
         tick_outer = dial_r - 4
         major_len = 16
         minor_len = 9
         label_r = tick_outer - major_len - 14
-
-        # Lato salita (positivo) e discesa (negativo)
         num_steps = int(self._max_abs / self._major_step)
 
-        for side in [1, -1]:  # 1 = salita, -1 = discesa
-            for i in range(num_steps + 1):
-                val = i * self._major_step * side
-                rot = self._value_to_rotation(val)
+        # --- Tacche maggiori e numeri (entrambi i lati) ---
+        for i in range(num_steps + 1):
+            val = i * self._major_step
+
+            # Lato positivo (UP) e negativo (DOWN)
+            for sign in ([1] if i == 0 else [1, -1]):
+                v = val * sign
+                rot = self._value_to_rotation(v)
 
                 # Tacca maggiore
                 p.save()
@@ -791,42 +795,60 @@ class VSIGaugeProfessional(UnitButtonsMixin, BaseInstrument):
                 p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + major_len))
                 p.restore()
 
-                # Numero (valore assoluto / label_scale)
-                if i == 0 and side == -1:
-                    continue  # lo 0 lo disegno una volta sola
-                label_val = abs(val) / self._label_scale
-                rad = math.radians(rot)
-                lx = cx + label_r * math.sin(rad)
-                ly = cy - label_r * math.cos(rad)
-                p.setPen(QColor(250, 250, 250))
-                nf = p.font()
-                nf.setPixelSize(13)
-                nf.setBold(True)
-                p.setFont(nf)
-                p.drawText(QRectF(lx - 16, ly - 8, 32, 16),
-                           Qt.AlignmentFlag.AlignCenter, f"{label_val:.0f}")
+                # Numero (solo per i > 0, lo 0 lo disegno una volta)
+                if i > 0 or sign == 1:
+                    label_val = val / self._label_scale
+                    rad = math.radians(rot)
+                    lx = cx + label_r * math.sin(rad)
+                    ly = cy - label_r * math.cos(rad)
+                    p.setPen(QColor(250, 250, 250))
+                    nf = p.font()
+                    nf.setPixelSize(13)
+                    nf.setBold(True)
+                    p.setFont(nf)
+                    p.drawText(QRectF(lx - 16, ly - 8, 32, 16),
+                               Qt.AlignmentFlag.AlignCenter, f"{label_val:.0f}")
 
-                # Tacche minori tra una maggiore e l'altra
-                if i < num_steps:
-                    for m in range(1, 3):
-                        mv = val + m * (self._major_step / 3.0) * side
-                        mr = self._value_to_rotation(mv)
-                        p.save()
-                        p.translate(cx, cy)
-                        p.rotate(mr)
-                        p.setPen(QPen(QColor(160, 160, 160), 1))
-                        p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + minor_len))
-                        p.restore()
+            # --- Tacche minori (tra questa e la prossima maggiore) ---
+            if i < num_steps:
+                for m in range(1, 3):
+                    frac = m / 3.0
 
-        # --- Etichette UP / DOWN ---
+                    # Lato positivo
+                    mv_pos = val + frac * self._major_step
+                    rot_pos = self._value_to_rotation(mv_pos)
+                    p.save()
+                    p.translate(cx, cy)
+                    p.rotate(rot_pos)
+                    p.setPen(QPen(QColor(160, 160, 160), 1))
+                    p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + minor_len))
+                    p.restore()
+
+                    # Lato negativo
+                    mv_neg = -(val + frac * self._major_step)
+                    rot_neg = self._value_to_rotation(mv_neg)
+                    p.save()
+                    p.translate(cx, cy)
+                    p.rotate(rot_neg)
+                    p.setPen(QPen(QColor(160, 160, 160), 1))
+                    p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + minor_len))
+                    p.restore()
+
+        # =====================================================================
+        # ETICHETTE UP / DOWN
+        # =====================================================================
         p.setPen(QColor(200, 210, 220))
         tf = p.font()
         tf.setPixelSize(11)
         tf.setBold(True)
         p.setFont(tf)
-        p.drawText(QRectF(cx - 40, cy - dial_r * 0.45, 80, 16),
+
+        # UP: in alto leggermente a sinistra (zona positiva)
+        p.drawText(QRectF(cx - 50, cy - dial_r * 0.36, 40, 16),
                    Qt.AlignmentFlag.AlignCenter, "UP")
-        p.drawText(QRectF(cx - 40, cy + dial_r * 0.32, 80, 16),
+
+        # DOWN: in basso leggermente a sinistra (zona negativa)
+        p.drawText(QRectF(cx - 50, cy + dial_r * 0.20, 46, 16),
                    Qt.AlignmentFlag.AlignCenter, "DOWN")
 
         # --- Titolo ---
@@ -847,7 +869,9 @@ class VSIGaugeProfessional(UnitButtonsMixin, BaseInstrument):
         p.drawText(QRectF(cx - 45, cy + dial_r * 0.08, 90, 12),
                    Qt.AlignmentFlag.AlignCenter, self._unit_label)
 
-        # --- Viti decorative ---
+        # =====================================================================
+        # VITI DECORATIVE
+        # =====================================================================
         screw_r = dial_r + 1
         for angle_deg in [45, 135, 225, 315]:
             rad = math.radians(angle_deg)
@@ -858,7 +882,6 @@ class VSIGaugeProfessional(UnitButtonsMixin, BaseInstrument):
             p.drawEllipse(QPointF(sx, sy), 2.0, 2.0)
             p.setPen(QPen(QColor(35, 35, 40), 1))
             p.drawLine(QPointF(sx - 1.2, sy - 1.2), QPointF(sx + 1.2, sy + 1.2))
-
     # =========================================================================
     # PRIMO PIANO
     # =========================================================================
@@ -907,6 +930,276 @@ class VSIGaugeProfessional(UnitButtonsMixin, BaseInstrument):
         p.drawEllipse(QPointF(cx, cy), 8, 8)
 
         # Effetto vetro
+        p.setPen(QPen(QColor(255, 255, 255, 18), 6))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        glass_r = dial_r - 4
+        glass_rect = QRectF(cx - glass_r, cy - glass_r, glass_r * 2, glass_r * 2)
+        p.drawArc(glass_rect, 30 * 16, 120 * 16)
+
+# =============================================================================
+# TURN COORDINATOR PROFESSIONAL
+# =============================================================================
+
+class TurnCoordinatorProfessional(TurnTargetMixin, BaseInstrument):
+    """
+    Virosbandometro professionale con:
+    - Bezel metallico con viti
+    - Aereo in miniatura dettagliato
+    - Scala L/R con tacche precise
+    - Inclinometro con pallina
+    - Effetto vetro
+    """
+
+    def __init__(self, prototype, parent=None):
+        super().__init__(prototype, parent)
+        self._turn_rate = 0.0
+        self._roll = 0.0
+        self.init_turn_target(3.0)
+
+    def update_data(self, data: TelemetryData):
+        self._turn_rate = data.turn_rate
+        self._roll = data.roll
+        self.update()
+
+    # =========================================================================
+    # SFONDO
+    # =========================================================================
+
+    def paint_background(self, p: QPainter):
+        w, h = self._prototype.width, self._prototype.height
+        cx, cy = w / 2, h / 2
+        outer_r = min(cx, cy) - 2
+
+        # Bezel metallico con gradiente
+        gradient = QRadialGradient(cx, cy, outer_r)
+        gradient.setColorAt(0.0, QColor(75, 75, 80))
+        gradient.setColorAt(0.70, QColor(55, 55, 60))
+        gradient.setColorAt(0.85, QColor(85, 85, 90))
+        gradient.setColorAt(0.95, QColor(65, 65, 70))
+        gradient.setColorAt(1.0, QColor(45, 45, 50))
+
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(gradient))
+        p.drawEllipse(QPointF(cx, cy), outer_r, outer_r)
+
+        # Quadrante nero
+        dial_r = outer_r - 3
+        p.setBrush(QColor(10, 10, 12))
+        p.drawEllipse(QPointF(cx, cy), dial_r, dial_r)
+
+        # --- Scala: tacche ogni 10° da -30 a +30 ---
+        tick_r = dial_r - 4
+        for deg in range(-30, 35, 10):
+            p.save()
+            p.translate(cx, cy)
+            p.rotate(deg)
+            if deg == 0:
+                tick_len, tick_w = 14, 2.5
+                tick_color = QColor(250, 250, 250)
+            else:
+                tick_len, tick_w = 12, 2.0
+                tick_color = QColor(245, 245, 245)
+            p.setPen(QPen(tick_color, tick_w))
+            p.drawLine(QPointF(0, -tick_r), QPointF(0, -tick_r + tick_len))
+            p.restore()
+
+        # Tacche minori ogni 5°
+        for deg in range(-30, 35, 5):
+            if deg % 10 == 0:
+                continue
+            p.save()
+            p.translate(cx, cy)
+            p.rotate(deg)
+            p.setPen(QPen(QColor(160, 160, 160), 1))
+            p.drawLine(QPointF(0, -tick_r), QPointF(0, -tick_r + 7))
+            p.restore()
+
+        # --- Etichette L e R ---
+        p.setPen(QColor(250, 250, 250))
+        lf = p.font()
+        lf.setPixelSize(17)
+        lf.setBold(True)
+        p.setFont(lf)
+
+        label_r = dial_r - 26
+        rad_l = math.radians(-40)
+        lx = cx + label_r * math.sin(rad_l)
+        ly = cy - label_r * math.cos(rad_l)
+        p.drawText(QRectF(lx - 14, ly - 10, 28, 20),
+                   Qt.AlignmentFlag.AlignCenter, "L")
+
+        rad_r = math.radians(40)
+        rx = cx + label_r * math.sin(rad_r)
+        ry = cy - label_r * math.cos(rad_r)
+        p.drawText(QRectF(rx - 14, ry - 10, 28, 20),
+                   Qt.AlignmentFlag.AlignCenter, "R")
+
+        # --- Titolo ---
+        p.setPen(QColor(200, 210, 220))
+        tf = p.font()
+        tf.setPixelSize(10)
+        tf.setBold(True)
+        p.setFont(tf)
+        p.drawText(QRectF(cx - 65, cy + dial_r * 0.46, 130, 16),
+                   Qt.AlignmentFlag.AlignCenter, "TURN COORDINATOR")
+
+        # --- Etichetta "2 MIN" ---
+        p.setPen(QColor(150, 160, 170))
+        uf = p.font()
+        uf.setPixelSize(8)
+        uf.setBold(False)
+        p.setFont(uf)
+        p.drawText(QRectF(cx - 30, cy + dial_r * 0.56, 60, 12),
+                   Qt.AlignmentFlag.AlignCenter, "2 MIN")
+
+        # --- Inclinometro (tubo bianco) ---
+        tube_bottom_y = cy + dial_r * 0.80
+        tube_half_w = dial_r * 0.28
+        tube_r = dial_r * 0.85
+        tube_cy = tube_bottom_y - tube_r
+        half_angle = math.degrees(math.asin(tube_half_w / tube_r))
+        arc_rect = QRectF(cx - tube_r, tube_cy - tube_r, tube_r * 2, tube_r * 2)
+        start_a = int((270 - half_angle) * 16)
+        span_a = int(2 * half_angle * 16)
+
+        # Corpo del tubo: arco spesso bianco
+        p.setPen(QPen(QColor(235, 238, 242), 12,
+                      Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawArc(arc_rect, start_a, span_a)
+
+        # Bordi del tubo (sopra e sotto)
+        outer_rect = QRectF(cx - tube_r - 6, tube_cy - tube_r - 6,
+                            (tube_r + 6) * 2, (tube_r + 6) * 2)
+        inner_rect = QRectF(cx - tube_r + 6, tube_cy - tube_r + 6,
+                            (tube_r - 6) * 2, (tube_r - 6) * 2)
+        p.setPen(QPen(QColor(80, 85, 90), 1))
+        p.drawArc(outer_rect, start_a, span_a)
+        p.drawArc(inner_rect, start_a, span_a)
+
+        # Linee di riferimento (nere su bianco)
+        ref_gap = 12
+        p.setPen(QPen(QColor(30, 30, 35), 1.5))
+        p.drawLine(QPointF(cx - ref_gap / 2, tube_bottom_y - 6),
+                   QPointF(cx - ref_gap / 2, tube_bottom_y + 6))
+        p.drawLine(QPointF(cx + ref_gap / 2, tube_bottom_y - 6),
+                   QPointF(cx + ref_gap / 2, tube_bottom_y + 6))
+
+
+        # --- Viti decorative ---
+        screw_r = dial_r + 1
+        for angle_deg in [45, 135, 225, 315]:
+            rad = math.radians(angle_deg)
+            sx = cx + screw_r * math.sin(rad)
+            sy = cy - screw_r * math.cos(rad)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(60, 60, 65))
+            p.drawEllipse(QPointF(sx, sy), 2.0, 2.0)
+            p.setPen(QPen(QColor(35, 35, 40), 1))
+            p.drawLine(QPointF(sx - 1.2, sy - 1.2), QPointF(sx + 1.2, sy + 1.2))
+
+    # =========================================================================
+    # PRIMO PIANO
+    # =========================================================================
+
+    def paint_foreground(self, p: QPainter):
+        w, h = self._prototype.width, self._prototype.height
+        cx, cy = w / 2, h / 2
+        dial_r = min(cx, cy) - 5
+
+        # Tacche target turn rate
+        self.draw_target_ticks(p, cx, cy, dial_r - 4)
+
+        # Mappatura turn_rate → angolo display
+        display_angle = self._turn_rate * (10.0 / 3.0)
+        display_angle = max(-45.0, min(45.0, display_angle))
+
+        # --- Lancetta di lettura scala (0° = ore 12) ---
+        p.save()
+        p.translate(cx, cy)
+        p.rotate(display_angle)
+
+        needle_len = dial_r - 12
+        inner_r = dial_r * 0.40
+
+        needle = QPainterPath()
+        needle.moveTo(0, -needle_len)
+        needle.lineTo(-3, -inner_r)
+        needle.lineTo(3, -inner_r)
+        needle.closeSubpath()
+
+        p.setPen(QPen(QColor(140, 70, 30), 1))
+        p.setBrush(QColor(255, 130, 40))
+        p.drawPath(needle)
+
+        p.restore()
+
+        # --- Aereo in miniatura ---
+        p.save()
+        p.translate(cx, cy)
+        p.rotate(display_angle)
+
+        wing_span = dial_r * 0.52
+        fuselage_h = 16
+
+        # Ombra dell'aereo
+        p.setPen(QPen(QColor(0, 0, 0, 60), 4))
+        p.drawLine(QPointF(-wing_span + 1, 2), QPointF(-8, 2))
+        p.drawLine(QPointF(8, 2), QPointF(wing_span - 1, 2))
+
+        # Ali principali
+        p.setPen(QPen(QColor(255, 255, 255), 3.5))
+        p.drawLine(QPointF(-wing_span, 0), QPointF(-8, 0))
+        p.drawLine(QPointF(8, 0), QPointF(wing_span, 0))
+
+        # Piegatura ali
+        p.setPen(QPen(QColor(255, 255, 255), 2.5))
+        p.drawLine(QPointF(-wing_span, 0), QPointF(-wing_span, 7))
+        p.drawLine(QPointF(wing_span, 0), QPointF(wing_span, 7))
+
+        # Fusoliera
+        p.setPen(QPen(QColor(255, 255, 255), 3))
+        p.drawLine(QPointF(0, -fuselage_h / 2), QPointF(0, fuselage_h / 2))
+
+        # Coda
+        p.drawLine(QPointF(-6, fuselage_h / 2), QPointF(6, fuselage_h / 2))
+
+        # Punto centrale
+        cap_gradient = QRadialGradient(0, 0, 4)
+        cap_gradient.setColorAt(0.0, QColor(255, 255, 255))
+        cap_gradient.setColorAt(1.0, QColor(180, 180, 180))
+        p.setBrush(QBrush(cap_gradient))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawEllipse(QPointF(0, 0), 3.5, 3.5)
+
+        p.restore()
+
+        # --- Pallina inclinometro (blu scuro con effetto 3D) ---
+        tube_bottom_y = cy + dial_r * 0.80
+        tube_half_w = dial_r * 0.28
+        tube_r = dial_r * 0.85
+        tube_cy = tube_bottom_y - tube_r
+        half_angle = math.degrees(math.asin(tube_half_w / tube_r))
+
+        ball_offset = max(-1.0, min(1.0, self._roll / 30.0))
+        ball_angle_deg = ball_offset * half_angle * 0.75
+
+        angle_rad = math.radians(270 + ball_angle_deg)
+        ball_x = cx + tube_r * math.cos(angle_rad)
+        ball_y = tube_cy - tube_r * math.sin(angle_rad)
+
+        ball_radius = 5.0
+
+        ball_gradient = QRadialGradient(ball_x - 1.5, ball_y - 1.5, ball_radius * 2)
+        ball_gradient.setColorAt(0.0, QColor(90, 130, 220))
+        ball_gradient.setColorAt(0.5, QColor(40, 75, 170))
+        ball_gradient.setColorAt(1.0, QColor(20, 40, 100))
+
+        p.setPen(QPen(QColor(15, 30, 70), 1))
+        p.setBrush(QBrush(ball_gradient))
+        p.drawEllipse(QPointF(ball_x, ball_y), ball_radius, ball_radius)
+
+        # --- Effetto vetro ---
         p.setPen(QPen(QColor(255, 255, 255, 18), 6))
         p.setBrush(Qt.BrushStyle.NoBrush)
         glass_r = dial_r - 4

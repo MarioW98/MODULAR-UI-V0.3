@@ -129,9 +129,12 @@ def _theme_base() -> InstrumentTheme:
         pitch_ladder_color=QColor(255, 255, 255),
         reference_color=QColor(255, 160, 0),
         aircraft_symbol_color=QColor(255, 200, 0),
-        selection_color=QColor(255, 193, 7),
-        scene_background=QColor(15, 18, 25),
-        grid_color=QColor(255, 255, 255, 18),
+        scene_background=QColor(230, 218, 188),  # Canapa
+        grid_color=QColor(180, 168, 145),         # Canapa scuro per contrasto
+        selection_color=QColor(0, 120, 215),
+        # selection_color=QColor(255, 193, 7),
+        # scene_background=QColor(15, 18, 25),
+        # grid_color=QColor(255, 255, 255, 18),
     )
 
 
@@ -168,9 +171,12 @@ def _theme_night() -> InstrumentTheme:
         pitch_ladder_color=QColor(110, 190, 210),
         reference_color=QColor(100, 220, 200),
         aircraft_symbol_color=QColor(150, 230, 240),
-        selection_color=QColor(80, 200, 220),
-        scene_background=QColor(10, 14, 20),
-        grid_color=QColor(100, 180, 200, 12),
+        scene_background=QColor(15, 18, 25),      # Attuale scuro
+        grid_color=QColor(40, 45, 55),            # Grigio scuro
+        selection_color=QColor(0, 200, 200),
+        # selection_color=QColor(80, 200, 220),
+        # scene_background=QColor(10, 14, 20),
+        # grid_color=QColor(100, 180, 200, 12),
     )
 
 

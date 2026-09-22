@@ -62,6 +62,10 @@ def build_default_registry() -> InstrumentRegistry:
                                    240, 240, "#311B92", "Orizzonte artificiale quadrato"))
     r.register(InstrumentPrototype("flight-vsi-pro", "VSI Pro", "Volo",
                                    200, 200, "#1A237E", "Variometro (Professional)"))
+    r.register(InstrumentPrototype("flight-turn-coord", "Turn Coordinator", "Volo",
+                                   200, 200, "#6A1B9A", "Virosbandometro"))
+    r.register(InstrumentPrototype("flight-turn-coord-pro", "Turn Coord Pro", "Volo",
+                                   200, 200, "#4A148C", "Virosbandometro (Professional)"))
     ## --- Digital ---
     r.register(InstrumentPrototype("flight-altimeter-digital", "Altimeter Digital", "Volo",
                                    70, 150, "#1E88E5", "Altimetro digitale"))
@@ -81,5 +85,26 @@ def build_default_registry() -> InstrumentRegistry:
                                    200, 200, "#004D40", "Indicatore di prua (Professional)"))
     r.register(InstrumentPrototype("flight-altimeter-pro", "Altimeter Pro", "Volo",
                                    200, 200, "#0D47A1", "Altimetro (Professional)"))
+
+    # --- Avanzati (serie speciale) ---
+    r.register(InstrumentPrototype("adv-sq-attitude", "Attitude AdvanceSq", "Avanzati",
+                                   240, 240, "#00695C",
+                                   "Orizzonte artificiale avanzato stile Garmin GI 275"))
+    # --- Comfort (anti-affaticamento visivo) ---
+    r.register(InstrumentPrototype("comfort-airspeed", "Airspeed Comfort", "Comfort",
+                                   200, 200, "#FF7E00",
+                                   "Anemometro analogico Comfort (arancio/verde)"))
+    r.register(InstrumentPrototype("comfort-altimeter", "Altimeter Comfort", "Comfort",
+                                   200, 200, "#FF7E00",
+                                   "Altimetro analogico Comfort (arancio/verde)"))
+    r.register(InstrumentPrototype("comfort-vsi", "VSI Comfort", "Comfort",
+                                   200, 200, "#FF7E00",
+                                   "Variometro analogico Comfort (arancio/verde)"))
+    r.register(InstrumentPrototype("comfort-heading", "Heading Comfort", "Comfort",
+                                   200, 200, "#FF7E00",
+                                   "Indicatore di prua Comfort (arancio/verde)"))
+    r.register(InstrumentPrototype("comfort-turn-coord", "Turn Coord Comfort", "Comfort",
+                                   200, 200, "#FF7E00",
+                                   "Virosbandometro Comfort (arancio/verde)"))
 
     return r
