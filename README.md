@@ -21,6 +21,9 @@ di simulazione sono demandate a un modulo backend separato, collegabile tramite 
 - [Status bar](#status-bar)
 - [Persistenza layout](#persistenza-layout)
 - [Prestazioni](#prestazioni)
+- [Cockpit Preview](#cockpit-preview)
+- [Preset di pannello](#preset-di-pannello)
+- [Scena](#scena)
 - [Prossimi passi](#prossimi-passi)
 
 ---
@@ -67,7 +70,7 @@ sim_ui/
 | ------------------------------ | -------------------------------------------------------------------------- |
 | `core/constants.py`            | Costanti globali (MIME, griglia, schema)                                   |
 | `core/prototype.py`            | Definizione prototipi e catalogo strumenti                                 |
-| `core/units.py`                | Definizioni unità, fattori di conversione, helper`unit_index`             |
+| `core/units.py`                | Definizioni unità, fattori di conversione, helper `unit_index`             |
 | `core/telemetry.py`            | Struttura dati telemetria e adapter                                        |
 | `core/theme.py`                | Parametri visivi centralizzati (inclusi sfondo scena e griglia)            |
 | `instruments/base.py`          | Classe base + mixin riutilizzabili                                         |
@@ -126,6 +129,12 @@ python -m sim_ui.main
 | Avanzati    | Attitude GI 275 con tape airspeed integrata                      | ✅    |
 | Salvataggio | Unità, target, palette, tema nel JSON                           | ✅    |
 | Temi        | Sfondo e griglia controllati dal tema                            | ✅    |
+| Hangar avanzato | Thumbnail, filtro stile, toggle lista                            | ✅    |
+| Cockpit Preview | Modalità sola visualizzazione (F5)                              | ✅    |
+| Preset di pannello | Libreria layout salvabili                                        | ✅    |
+| Ottimizzazioni | Culling telemetrico + cache strumenti                           | ✅    |
+| Contratto SI | Telemetria in Sistema Internazionale                              | ✅    |
+| Scena       | Righelli viewport + linee centrali                                 | ✅    |
 
 ---
 
@@ -175,7 +184,8 @@ python -m sim_ui.main
 | **Base**                   | Stile originale, colori piatti                 | ✅ Completo |
 | **Professional**           | Bezel metallico, viti, effetto vetro, dettagli | 🔄 Parziale |
 | **Digital**                | Display digitali con nastro scorrevole         | ✅ Completo |
-| **Minimal**               | Minimal da sovrapporre a video                 | ⬜ Da fare  |
+| **Advance**                | Alta fedeltà ispirati a strumenti reali (GI 275) | ✅ In crescita |
+| **Minimal**                | Minimal da sovrapporre a video                 | ⬜ Pianificato |
 | **Comfort** (Orange/Green) | Anti-affaticamento visivo                      | ✅ Completo |
 
 ### Strumenti — Volo
@@ -193,8 +203,8 @@ python -m sim_ui.main
 | Attitude            | `flight-attitude`          | Base         | 220×220 | —            | Orizzonte semplice        |
 | Attitude Full       | `flight-attitude-full`     | Base         | 240×240 | —            | Scale pitch/roll          |
 | Attitude Square     | `flight-attitude-square`   | Base         | 240×240 | —            | Quadrato, ±180°         |
-| Turn Coodinator     | `flight-turn-coord`        | Base         | 200x200  |               |                           |
-| Turn Coodinator Pro | `flight-turn-coord-pro`    | Professional | 200x200  |               |                           |
+| Turn Coordinator     | `flight-turn-coord`        | Base         | 200x200  |               |                           |
+| Turn Coordinator Pro | `flight-turn-coord-pro`    | Professional | 200x200  |               |                           |
 
 ### Strumenti — Motore
 
@@ -226,7 +236,7 @@ python -m sim_ui.main
 | ------------------ | -------------------- | ------- | -------- | ---- |
 | Airspeed Comfort   | `comfort-airspeed`   | Comfort | 200×200 |      |
 | Altimeter Comfort  | `comfort-altimeter`  | Comfort | 200×200 |      |
-| VSI Comfort        | `comfort-VSI`        | Comfort | 200×200 |      |
+| VSI Comfort        | `comfort-vsi`        | Comfort | 200×200 |      |
 | Heading Comfort    | `comfort-heading`    | Comfort | 200×200 |      |
 | Turn Coord Comfort | `comfort-turn-coord` | Comfort | 200×200 |      |
 
@@ -282,12 +292,11 @@ python -m sim_ui.main
 
 I mixin in `base.py` forniscono funzionalità riutilizzabili componibili con le classi strumento.
 
-| Mixin              | Funzione                                                    | Usato da                       | Note                  |
-| ------------------ | :---------------------------------------------------------- | ------------------------------ | --------------------- |
-| `UnitButtonsMixin` | Pulsanti cambio unità (tondo + triangolo) in alto a destra | Strumenti con unità di misura | Rivedere il triangolo |
-| `TurnTargetMixin`  | Target turn rate regolabile con tacche e pulsanti           | Turn Coordinator               |                       |
-| `ColorSelectorMixin`| Selettore palette in basso a destra                         |                                |                       |
-|                    |                                                             |                                |                       |
+| Mixin                | Funzione                                                    | Usato da                       |
+| -------------------- | ----------------------------------------------------------- | ------------------------------ |
+| `UnitButtonsMixin`   | Pulsanti cambio unità (tondo + triangolo) in alto a destra | Strumenti con unità di misura |
+| `TurnTargetMixin`    | Target turn rate regolabile con tacche e pulsanti           | Turn Coordinator               |
+| `ColorSelectorMixin` | Selettore palette in basso a destra                         | Strumenti Comfort              |
 
 ### Method Resolution Order (MRO)
 
@@ -333,11 +342,13 @@ I pulsanti non interferiscono con il drag dello strumento.
 ### Unità definite
 
 
-| Grandezza           | Costante         | Unità                | Fattore                       | Strumenti                                   |
-| ------------------- | ---------------- | --------------------- | ----------------------------- | ------------------------------------------- |
-| Velocità           | `AIRSPEED_UNITS` | KNOTS, KM/H, MPH, M/S | 1.0, 1.852, 1.15078, 0.514444 | Airspeed, Airspeed Pro, Advance                      |
-| Altitudine          | `ALTITUDE_UNITS` | FEET, METERS          | 1.0, 0.3048                   | Altimeter, Altimeter Pro, Altimeter Digital |
-| Velocità verticale | `VSI_UNITS`      | FT/MIN, M/S, FT/SEC    | 1.0, 0.00508                  | VSI Pro, VSI Digital                        |
+| Grandezza | Costante | Unità (base SI prima) | Fattore | Strumenti |
+|---|---|---|---|---|
+| Velocità | `AIRSPEED_UNITS` | **M/S**, KNOTS, KM/H, MPH | 1.0, 1.94384, 3.6, 2.23694 | Airspeed, Airspeed Pro, Advance |
+| Altitudine | `ALTITUDE_UNITS` | **METERS**, FEET | 1.0, 3.28084 | Altimeter, Altimeter Pro, Altimeter Digital |
+| Velocità verticale | `VSI_UNITS` | **M/S**, FT/MIN, FT/SEC | 1.0, 196.85, 3.28084 | VSI Pro, VSI Digital |
+
+> I valori interni di `TelemetryData` sono sempre in SI. La conversione è a carico di `UnitButtonsMixin`.
 
 ### Unità di default
 
@@ -357,17 +368,17 @@ Tutti gli strumenti partono con l'unità del **Sistema internazionale**:
 ```python
 @dataclass
 class TelemetryData:
-    airspeed: float = 0.0
-    altitude: float = 0.0
-    rpm: float = 0.0
-    oil_temp: float = 0.0
-    heading: float = 0.0
-    pitch: float = 0.0
-    roll: float = 0.0
-    manifold_pressure: float = 0.0
-    fuel_flow: float = 0.0
-    vertical_speed: float = 0.0
-    turn_rate: float = 0.0
+    airspeed: float = 0.0           # m/s
+    altitude: float = 0.0           # m
+    vertical_speed: float = 0.0     # m/s
+    heading: float = 0.0            # gradi (0-360)
+    pitch: float = 0.0              # gradi
+    roll: float = 0.0               # gradi
+    turn_rate: float = 0.0          # gradi/s
+    rpm: float = 0.0                # giri/min
+    oil_temp: float = 0.0           # °C
+    manifold_pressure: float = 0.0  # kPa
+    fuel_flow: float = 0.0          # kg/s
 ```
 
 ### Adapter
@@ -376,7 +387,7 @@ class TelemetryData:
 | Adapter                    | Descrizione                                     |
 | -------------------------- | ----------------------------------------------- |
 | `MockTelemetryAdapter`     | Dati sinusoidali simulati, frequenza regolabile |
-| `ExternalTelemetryAdapter` | Riceve dati dal backend reale via`push_data()`  |
+| `ExternalTelemetryAdapter` | Riceve dati dal backend reale via `push_data()`  |
 
 ### Gestione FPS target
 
@@ -424,6 +435,7 @@ Il dock Hangar contiene:
 
 - **Doppio-click**: aggiunge lo strumento al centro della vista.
 - **Drag & drop**: trascina lo strumento nella posizione desiderata.
+- **Toggle miniature/lista**: pulsante per passare da icone 52×52 a lista compatta
 
 ---
 
@@ -539,11 +551,11 @@ Implementazione:
 
 ### Campi globali salvati
 
-| Campo         | Descrizione                                  |
-| ------------- | -------------------------------------------- |
-| `type_id` | Tema attivo (Base/Night)                    |
-| `snap_enabled`     | Stato snap alla griglia |
-| `grid_size`     | Dimensione della griglia |
+| Campo          | Descrizione                   |
+| -------------- | ----------------------------- |
+| `theme_id`     | Tema attivo (Base/Night)      |
+| `snap_enabled` | Stato snap alla griglia       |
+| `grid_size`    | Dimensione della griglia      |
 
 ### Stato per strumento (`state`)
 
@@ -558,6 +570,29 @@ Il campo `state` contiene lo stato dei mixin presenti nello strumento:
 Uno strumento può avere più chiavi contemporaneamente (es. un Comfort con unità e palette).
 
 
+## Cockpit Preview
+
+Modalità sola visualizzazione (tasto **F5** o Vista → Cockpit Preview):
+- Nasconde Hangar e toolbar di editing
+- Disabilita selezione e spostamento strumenti
+- Attiva pan con drag (mano)
+- Mantiene telemetria e tema attivi
+
+## Preset di pannello
+
+Libreria di layout salvabili (File → Preset):
+- Salvati come JSON nella cartella `presets/`
+- Salvataggio con nome, conferma sovrascrittura
+- Dialog "Gestisci preset" per rinominare/eliminare
+- Ogni preset include strumenti, unità, palette, tema
+
+## Scena
+
+- SceneRect centrato in (0,0): coordinate da (-800,-450) a (800,450)
+- Griglia visibile solo con Snap attivo (Ctrl+G)
+- Linee centrali (rosso, dash-dot) visibili con Snap attivo
+- Righelli X (alto) e Y (destra) fissi nel viewport, si aggiornano con pan/zoom
+
 ## Prestazioni
 
 ### Ottimizzazioni implementate
@@ -566,11 +601,13 @@ Uno strumento può avere più chiavi contemporaneamente (es. un Comfort con unit
 | Ottimizzazione        | Descrizione                                          |
 | --------------------- | ---------------------------------------------------- |
 | Cache sfondo          | `paint_background` renderizzato una volta in QPixmap |
-| MinimalViewportUpdate | Ridisegna solo le aree cambiate                      |
-| OpenGL opzionale      | Rendering GPU con fallback software                  |
-| FPS Counter           | Misura la frequenza di aggiornamento reale           |
-| FPS Target            | Regola la frequenza del mock adapter                 |
-| Stress test           | Genera 10/50/100 strumenti per test di carico        |
+| Culling telemetrico   | Evita aggiornamenti telemetrici fuori dalla vista   |
+| MinimalViewportUpdate | Ridisegna solo le aree cambiate                     |
+| Cache strumenti       | Riduce il lavoro ripetuto nel rendering             |
+| OpenGL opzionale      | Rendering GPU con fallback software                 |
+| FPS Counter           | Misura la frequenza di aggiornamento reale          |
+| FPS Target            | Regola la frequenza del mock adapter                |
+| Stress test           | Genera 10/50/100 strumenti per test di carico      |
 
 ### Viewport OpenGL
 
@@ -584,20 +621,21 @@ Attivabile da **Vista → OpenGL**:
 
 ## Prossimi passi
 
-### Priorità maggiore
+### In programma
+- Finestra grafica del simulatore (futura camera drone)
+- Step 9: interazione strumenti (knob, popup, toggle)
 
-- Cockpit Preview: modalità solo visualizzazione senza editor, hangar e toolbar
-- Preset di pannello: libreria di layout salvabili/caricabili
-- Thumbnail nell'Hangar per identificare visivamente gli strumenti
-- Filtro per stile nell'Hangar (tutti / Base / Pro / Digital / Advance / Comfort)
-- Completare strumenti Professional mancanti (RPM Pro, Oil Temp Pro, Attitude Pro, Heading Pro)
+### Rimandato
+- Completare Professional mancanti (RPM Pro, Oil Temp Pro, Attitude Pro)
+- LOD per ottimizzazione estrema
 
-### Priorità minore
 
-- Culling / LOD per ottimizzazione con molti strumenti
-- Fase 9: interazione strumenti (knob, popup, toggle) — rimandata
+## Collaborazione e contratto dati
 
----
+- Il backend fornisce dati in SI tramite `push_data()`
+- `TelemetryData` è il contratto tra simulatore e interfaccia
+- Regola: aggiunte di campi solo additive (mai rinomine senza accordo)
+- La grafica modifica solo `paint_background`/`paint_foreground`
 
 ## Note architetturali
 
@@ -641,7 +679,7 @@ Il sistema `save_state()` / `restore_state()` in `BaseInstrument` raccoglie lo s
 | Temi | Aggiunto effetto su sfondo scena e griglia; tema Base = canapa |
 | Catalogo | Aggiunti Turn Coordinator, AttitudeAdvance, 5 strumenti Comfort; rimosso stile Clean |
 | Mixin | Nuova sezione dedicata (`UnitButtonsMixin`, `TurnTargetMixin`, `ColorSelectorMixin`) |
-| Unità | Aggiunto FT/SEC; default SI; helper `unit_index` |
+| Unità | Contratto SI; aggiunto FT/SEC; default SI; helper `unit_index` |
 | Persistenza | Ora salva unità, target, palette, tema; nuovo campo `state` e `theme_id` |
 | Telemetria | Aggiunto campo `turn_rate` |
 | Prossimi passi | Rimosso Clean in favore di Minimal; aggiornate priorità |
