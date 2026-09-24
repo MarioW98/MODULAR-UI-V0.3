@@ -1,1 +1,0 @@
-"""Flight Simulator UI — pacchetto principale."""
