@@ -1,4 +1,4 @@
-# Flight Simulator MODULAR UI — V0.2
+# Flight Simulator MODULAR UI — V0.3
 
 Interfaccia grafica modulare per un simulatore di volo, costruita con Python e PySide6 (Qt 6).
 Il progetto gestisce esclusivamente la componente visiva e l'interazione UI: la fisica e la logica
@@ -25,6 +25,7 @@ di simulazione sono demandate a un modulo backend separato, collegabile tramite 
 - [Preset di pannello](#preset-di-pannello)
 - [Scena](#scena)
 - [Prossimi passi](#prossimi-passi)
+- [Collaborazione e contratto dati](#collaborazione-e-contratto-dati)
 
 ---
 
@@ -421,7 +422,9 @@ adapter.push_data(TelemetryData(airspeed=145.0, altitude=4200.0, ...))
 Il dock Hangar contiene:
 
 1. **Barra di ricerca** (QLineEdit) — sempre visibile in alto
-2. **Lista strumenti** (QListWidget) — raggruppati per categoria
+2. **Filtro per stile** (QComboBox) — Tutti / Base / Professional / Digital / Advance / Comfort
+3. **Toggle miniature/lista** (QToolButton)
+4. **Lista strumenti** (QListWidget) — raggruppati per categoria
 
 ### Barra di ricerca
 
