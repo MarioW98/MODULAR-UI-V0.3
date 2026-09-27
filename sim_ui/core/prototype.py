@@ -107,5 +107,18 @@ def build_default_registry() -> InstrumentRegistry:
     r.register(InstrumentPrototype("comfort-turn-coord", "Turn Coord Comfort", "Comfort",
                                    200, 200, "#FF7E00",
                                    "Virosbandometro Comfort",style="Comfort"))
-
+    # --- Display ---
+    r.register(InstrumentPrototype("display-viewport", "Simulator Viewport", "Display",
+                                   1000, 600, "#2C3E50", "Finestra visuale simulatore",
+                                   style="Display"))
+    # --- Strumenti per Display ---
+    r.register(InstrumentPrototype("view-airspeed-tape", "Airspeed Tape", "Visualizzazione",
+                                   80, 240, "#1A237E", "Anemometro a nastro verticale",
+                                   style="View"))
+    r.register(InstrumentPrototype("view-altimeter-tape", "Altimeter Tape", "Visualizzazione",
+                                   80, 240, "#1A237E", "Altimetro a nastro verticale",
+                                   style="View"))
+    r.register(InstrumentPrototype("view-heading-tape", "Heading Tape", "Visualizzazione",
+                                   250, 60, "#1A237E", "Bussola a nastro orizzontale",
+                                   style="View"))
     return r

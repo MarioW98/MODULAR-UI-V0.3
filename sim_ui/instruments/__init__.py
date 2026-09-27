@@ -27,5 +27,11 @@ from .comfort_instr import (
     AirspeedComfort, AltimeterComfort, VSIComfort, 
     HeadingComfort, TurnCoordinatorComfort,
 )
+from .viewport import SimulatorViewport
+
+from .view_instr import (
+    AirspeedTape, AltimeterTape, HeadingTape,
+)
+
 
 from .factory import InstrumentFactory

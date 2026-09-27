@@ -15,7 +15,8 @@ from ..core.constants import MIME_INSTRUMENT
 from ..instruments.factory import InstrumentFactory
 
 # Ordine e nomi degli stili per il filtro
-STYLE_ORDER = ["Base", "Professional", "Digital", "Advance", "Comfort"]
+STYLE_ORDER = ["Base", "Professional","Digital", "Advance",
+               "Comfort", "Display", "View"]
 
 
 class HangarDockWidget(QDockWidget):

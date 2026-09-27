@@ -6,6 +6,17 @@ di simulazione sono demandate a un modulo backend separato, collegabile tramite 
 
 ---
 
+## Preview
+
+<p align="center">
+  <img src="im_b_light.png" width="45%" />
+  <img src="im_b_dark.png" width="45%" />
+</p>
+<p align="center">
+  <img src="im_comf.png" width="45%"/>
+</p>
+
+
 ## Indice
 
 - [Struttura del pacchetto](#struttura-del-pacchetto)
