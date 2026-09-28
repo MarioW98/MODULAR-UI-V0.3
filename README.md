@@ -73,7 +73,7 @@ sim_ui/
     ├── hangar_instr.py         # Hangar con barra di ricerca + drag&drop
     ├── scene.py                # InstrumentScene (griglia, snap)
     ├── view.py                 # InstrumentGraphicsView + FPSCounter
-    └── window.py               # MainWindow (menu, toolbar, editing, persistenza)
+    └── window.py               # MainWindow (menu, toolbar, editing, salvataggi)
 ```
 
 ### Responsabilità dei moduli
