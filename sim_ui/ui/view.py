@@ -71,8 +71,11 @@ class InstrumentGraphicsView(QGraphicsView):
 
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
-
+        # NOTA: QGraphicsView::setAcceptDrops(true) Propaga già l'attributo
+        # al viewport; lo ribadiamo esplicitamente perché è il viewport (non
+        # la view) il ricevitore reale degli eventi di drag & drop.
         self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
         # Referenza al viewport corrente: il filtro eventi va re-installato
         # ogni volta che setViewport() sostituisce il widget (toggle OpenGL).
         self._viewport_widget = self.viewport()
@@ -154,12 +157,36 @@ class InstrumentGraphicsView(QGraphicsView):
         self._sync_rulers_geometry()
         self._update_rulers()
 
+    def _ensure_viewport_dnd(self):
+        """Riabilita il drag & drop sul viewport corrente.
+
+        Contesto: in Qt gli eventi di drag & drop vengono recapicati al
+        *widget sotto il cursore*, cioè al VIEWPORT, non alla view.
+        QGraphicsView (via QAbstractScrollArea) delega al viewport solo se
+        questi ha l'attributo Qt.WA_AcceptDrops attivo. Quando si sostituisce
+        il viewport con setViewport() — es. switch a QOpenGLWidget o ritorno
+        al rendering software — il nuovo widget nasce senza tale attributo e
+        il drag & drop dall'hangar si rompe silenziosamente (nessun errore,
+        nessun drop accettato). Lo ribadiamo qui dopo OGNI cambio viewport.
+        """
+        vp = self.viewport()
+        vp.setAttribute(Qt.WA_AcceptDrops, True)
+        vp.setAcceptDrops(True)
+
     # =========================================================================
     # EVENT FILTER
     # =========================================================================
 
     def eventFilter(self, obj, event):
         et = event.type()
+
+        # Drag & drop: con il viewport nativo di default, QAbstractScrollArea
+        # rimanda gli eventi drag al viewport che NON ha handler propri ->
+        # li intercettiamo qui. Con viewport OpenGL (widget nuovo, senza
+        # delega) idem. In entrambi i casi il drop deve funzionare.
+        if self._viewport_drag_event(obj, event):
+            return True
+
 
         # Se il viewport cambia dimensione, allinea l'overlay
         if obj is self.viewport() and et == QEvent.Type.Resize:
@@ -278,39 +305,76 @@ class InstrumentGraphicsView(QGraphicsView):
     def _reset_cursor(self):
         self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
-    def dragEnterEvent(self, e):
+    def _accepts_mime(self, e) -> bool:
         m = e.mimeData()
-        if m and m.hasFormat(MIME_INSTRUMENT):
-            e.acceptProposedAction()
-            self._set_drag_cursor()
+        return m is not None and m.hasFormat(MIME_INSTRUMENT)
+
+    def _handle_drag_enter(self, e, from_viewport: bool) -> bool:
+        if not self._accepts_mime(e):
+            return False
+        e.acceptProposedAction()
+        self._set_drag_cursor()
+        return True
+
+    def _handle_drag_move(self, e, from_viewport: bool) -> bool:
+        if not self._accepts_mime(e):
+            return False
+        e.acceptProposedAction()
+        return True
+
+    def _handle_drop(self, e, from_viewport: bool) -> bool:
+        if not self._accepts_mime(e):
+            return False
+
+        pos = e.position().toPoint()
+        sp = self.mapToScene(pos) if not from_viewport \
+            else self.mapToScene(self.viewport().mapTo(self, pos))
+        tid = bytes(e.mimeData().data(MIME_INSTRUMENT)).decode("utf-8", errors="ignore")
+        self.instrument_dropped.emit(tid, sp)
+        e.acceptProposedAction()
+        self._reset_cursor()
+        return True
+
+    # --- canali VIEW
+
+    def dragEnterEvent(self, e):
+        if self._accepts_mime(e):
+            self._handle_drag_enter(e, from_viewport=False)
         else:
-            super().dragEnterEvent(e)
+            e.ignore()
 
     def dragMoveEvent(self, e):
-        m = e.mimeData()
-        if m and m.hasFormat(MIME_INSTRUMENT):
-            e.acceptProposedAction()
+        if self._accepts_mime(e):
+            self._handle_drag_move(e, from_viewport=False)
         else:
-            super().dragMoveEvent(e)
+            e.ignore()
 
     def dragLeaveEvent(self, e):
         self._reset_cursor()
         super().dragLeaveEvent(e)
 
     def dropEvent(self, e):
-        m = e.mimeData()
-        if not m or not m.hasFormat(MIME_INSTRUMENT):
-            super().dropEvent(e)
-            return
+        if self._accepts_mime(e):
+            self._handle_drop(e, from_viewport=False)
+        else:
+            e.ignore()
 
-        tid = bytes(m.data(MIME_INSTRUMENT)).decode("utf-8", errors="ignore")
-        vp = e.position().toPoint()
-        vp2 = self.viewport().mapFrom(self, vp)
-        sp = self.mapToScene(vp2)
 
-        self.instrument_dropped.emit(tid, sp)
-        e.acceptProposedAction()
-        self._reset_cursor()
+# -- canali VIEWPORT
+
+    def _viewport_drag_event(self, obj, event) -> bool:
+
+        et = event.type()
+        if et == QEvent.Type.Drop:
+            return self._handle_drop(event, from_viewport=True)
+        if et == QEvent.Type.DragEnter:
+            return self._handle_drag_enter(event, from_viewport=True)
+        if et == QEvent.Type.DragMove:
+            return self._handle_drag_move(event, from_viewport=True)
+        if et == QEvent.Type.DragLeave:
+            self._reset_cursor()
+            return True
+        return False
 
     # =========================================================================
     # OPENGL
@@ -349,6 +413,11 @@ class InstrumentGraphicsView(QGraphicsView):
         # Ricrea l'overlay dei righelli sul nuovo viewport
         self._setup_rulers_overlay()
         self._update_rulers()
+
+        #forza redraw completo della scena
+        if self.scene() is not None:
+            self.scene().invalidate()
+        self.viewport().update()
 
     def is_opengl(self) -> bool:
         if not OPENGL_AVAILABLE:
