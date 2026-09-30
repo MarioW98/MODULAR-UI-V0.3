@@ -385,39 +385,76 @@ class InstrumentGraphicsView(QGraphicsView):
         Attiva/disattiva rendering OpenGL.
         Dopo il cambio viewport ricreo sempre l'overlay dei righelli.
         """
-        if not OPENGL_AVAILABLE or self.is_opengl():
+        if not OPENGL_AVAILABLE:
             return
-        from PySide6.QtGui import QSurfaceFormat
 
-        fmt = QSurfaceFormat()
-        fmt.setSamples(4)
-        fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
+        current_is_gl = isinstance(self.viewport(), QOpenGLWidget)
+        if enabled == current_is_gl:
+            return  # già nello stato richiesto
 
-        gl_widget = QOpenGLWidget()
-        gl_widget.setFormat(fmt)
-        self.setViewport(gl_widget)
+        # Ricorda il rettangolo del vecchio viewport: QGraphicsView mantiene
+        # la geometria del widget che viene sostituito, quindi il nuovo
+        # viewport eredita size/position corretti.
+        old_vp = self.viewport()
+        old_rect = old_vp.geometry()
 
+        if enabled:
+            from PySide6.QtGui import QSurfaceFormat
 
-        self._viewport_widget = self.viewport()
-        self._viewport_widget.installEventFilter(self)
+            fmt = QSurfaceFormat()
+            fmt.setSamples(4)
+            fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
 
-        self.setViewportUpdateMode(
-                QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate
-            )
-        self.setCacheMode(QGraphicsView.CacheModeFlag.CacheNone)
+            gl_widget = QOpenGLWidget()
+            gl_widget.setFormat(fmt)
+            new_vp = gl_widget
+        else:
+            # Ritorno al rendering software: QWidget standard, identico a
+            # quello creato di default da QGraphicsView.
+            # WA_OpaquePaintEvent NON va impostato: il viewport nativo di
+            # QGraphicsView non ce l'ha e metterlo può dare artefatti.
+            new_vp = QWidget(self)
+
+        # Prima di abbandonare il vecchio viewport OpenGL, rilascia il suo
+        # contesto: evita contesti GL orfani quando si fa ON->OFF->ON.
+        if isinstance(old_vp, QOpenGLWidget):
+            try:
+                old_vp.makeCurrent()
+                old_vp.doneCurrent()
+            except Exception:
+                pass
+
+        self.setViewport(new_vp)
+        new_vp.setGeometry(old_rect)
+
+        # FONDAMENTALE per il DnD: il nuovo viewport nasce senza
+        # Qt.WA_AcceptDrops; senza questo, da qui in poi ogni drop
+        # dall'hangar verrebbe rifiutato in silenzio.
+        self._ensure_viewport_dnd()
 
         # Reinstalla event filter e mouse tracking sul nuovo viewport
-        self.viewport().installEventFilter(self)
-        self.viewport().setMouseTracking(True)
+        self._install_viewport_filter()
+
+        # Con viewport OpenGL serve FullViewportUpdate per evitare artefatti
+        # di partial repaint (residui/ghosting degli strumenti trascinati).
+        if enabled:
+            self.setViewportUpdateMode(
+                QGraphicsView.ViewportUpdateMode.FullViewportUpdate
+            )
+        else:
+            self.setViewportUpdateMode(
+                QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate
+            )
 
         # Ricrea l'overlay dei righelli sul nuovo viewport
         self._setup_rulers_overlay()
         self._update_rulers()
 
-        #forza redraw completo della scena
+        # Forza redraw completo della scena
         if self.scene() is not None:
             self.scene().invalidate()
         self.viewport().update()
+
 
     def is_opengl(self) -> bool:
         if not OPENGL_AVAILABLE:
