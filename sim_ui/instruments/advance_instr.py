@@ -582,3 +582,606 @@ class AttitudeAdvance(UnitButtonsMixin, BaseInstrument):
         p.drawText(QRectF(x + 25, y, 30, 18),
                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                    f"{value:+.1f}°")
+
+# =============================================================================
+# PRIMARY FLIGHT DISPLAY (G500/G600 style)
+# =============================================================================
+
+class PrimaryFlightDisplay(BaseInstrument):
+    """
+    Primary Flight Display ispirato al Gulfstream G500/G600.
+    Dimensioni: 960×720 (formato 4:3)
+    
+    Features:
+    - Attitude indicator centrale
+    - Airspeed tape (sinistra) con cambio unità
+    - Altitude tape (destra)
+    - Roll indicator, boresight, aircraft symbol
+    """
+
+    # Colori PFD (fissi, non usano il tema)
+    _SKY_COLOR = QColor(20, 60, 140)
+    _GROUND_COLOR = QColor(90, 50, 20)
+    _HORIZON_COLOR = QColor(255, 255, 255)
+    _PITCH_LADDER_COLOR = QColor(255, 255, 255)
+    _AIRCRAFT_SYMBOL_COLOR = QColor(255, 180, 0)  # Ambra
+    _BORESIGHT_COLOR = QColor(255, 255, 255)
+    _BEZEL_COLOR = QColor(10, 10, 12)
+    _TAPE_BG = QColor(0, 0, 0, 180)
+    _TAPE_BORDER = QColor(255, 255, 255, 100)
+    _UNIT_BTN_COLOR = QColor(40, 40, 45, 220)
+    _UNIT_BTN_BORDER = QColor(255, 126, 0)  # Ambra
+
+    def __init__(self, prototype, parent=None):
+        super().__init__(prototype, parent)
+        self._pitch = 0.0
+        self._roll = 0.0
+        self._airspeed = 0.0  # m/s (SI)
+        self._altitude = 0.0  # m (SI)
+        self._heading = 0.0 # gradi
+        self._px_per_deg = 6.0
+        
+        # Airspeed tape
+        self._tape_width = 45
+        self._px_per_unit = 8.0  # pixel per unità (m/s)
+        
+        # Gestione unità
+        self._units = AIRSPEED_UNITS
+        self._unit_idx = 0  # Inizia con M/S (indice 0)
+        self._unit_btn_rect = QRectF()  # Rettangolo del pulsante per hit-test
+        
+        # Altitude tape
+        self._px_per_foot = 0.5
+
+        # Gestione unità altitudine
+        self._altitude_units = ALTITUDE_UNITS
+        self._altitude_unit_idx = 0  # Inizia con METERS (indice 0)
+        self._altitude_btn_rect = QRectF()  # Rettangolo pulsante altitudine
+
+        
+        # Geometria arco bussola (centro sotto il bordo => curvatura dolce)
+        self._hdg_center_below = 170   # quanto il centro sta sotto h
+        self._hdg_radius = 320         # raggio bordo esterno
+        self._hdg_band = 50            # spessore nastro
+        self._hdg_span = 50            # ± gradi visibili
+
+    def update_data(self, data: TelemetryData):
+        self._pitch = data.pitch
+        self._roll = data.roll
+        self._airspeed = data.airspeed
+        self._altitude = data.altitude
+        self._heading = data.heading       
+        self.update()
+
+    def _current_unit(self):
+        """Restituisce l'unità corrente."""
+        return self._units[self._unit_idx]
+
+    def _next_unit(self):
+        """Passa all'unità successiva ciclicamente."""
+        self._unit_idx = (self._unit_idx + 1) % len(self._units)
+        self.update()
+
+    def _current_altitude_unit(self):
+        """Restituisce l'unità corrente per l'altitudine."""
+        return self._altitude_units[self._altitude_unit_idx]
+
+    def _next_altitude_unit(self):
+        """Passa all'unità successiva per l'altitudine."""
+        self._altitude_unit_idx = (self._altitude_unit_idx + 1) % len(self._altitude_units)
+        self.update()
+
+    def mousePressEvent(self, event):
+        """Gestisce il click sui pulsanti unità."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._unit_btn_rect.contains(event.pos()):
+                self._next_unit()
+                event.accept()
+                return
+            if self._altitude_btn_rect.contains(event.pos()):
+                self._next_altitude_unit()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    # =========================================================================
+    # DISEGNO
+    # =========================================================================
+
+    def paint_background(self, painter: QPainter):
+        """Disegna il bezel nero del PFD."""
+        w, h = self._prototype.width, self._prototype.height
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._BEZEL_COLOR)
+        painter.drawRect(0, 0, w, h)
+
+    def paint_foreground(self, painter: QPainter):
+        """Disegna l'attitude indicator + airspeed tape + altitude tape."""
+        painter.setRenderHints(
+            QPainter.RenderHint.Antialiasing |
+            QPainter.RenderHint.TextAntialiasing |
+            QPainter.RenderHint.SmoothPixmapTransform
+        )
+        try:
+            w, h = self._prototype.width, self._prototype.height
+            cx = w / 2
+            cy = h / 2
+
+            # --- 1. ATTITUDE INDICATOR (con clipping) ---
+            painter.save()
+            clip_path = QPainterPath()
+            clip_path.addRect(0, 0, w, h)
+            painter.setClipPath(clip_path)
+
+            # Rotazione e pitch
+            painter.save()
+            painter.translate(cx, cy)
+            painter.rotate(-self._roll)
+            pitch_offset = self._pitch * self._px_per_deg
+
+            # Cielo e terra
+            large = max(w, h) * 3
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(self._SKY_COLOR)
+            painter.drawRect(QRectF(-large, -large + pitch_offset, large * 2, large))
+            painter.setBrush(self._GROUND_COLOR)
+            painter.drawRect(QRectF(-large, pitch_offset, large * 2, large))
+
+            # Linea orizzonte
+            painter.setPen(QPen(self._HORIZON_COLOR, 2))
+            painter.drawLine(QPointF(-large, pitch_offset), QPointF(large, pitch_offset))
+
+            # Pitch ladder
+            painter.setPen(QPen(self._PITCH_LADDER_COLOR, 1))
+            font = painter.font()
+            font.setPixelSize(14)
+            font.setBold(True)
+            font.setFamily("Consolas")
+            painter.setFont(font)
+
+            for deg in range(-90, 95, 5):
+                if deg == 0:
+                    continue
+                y_pos = pitch_offset - deg * self._px_per_deg
+                if y_pos < -large or y_pos > large:
+                    continue
+
+                if deg % 10 == 0:
+                    half_w = 50
+                    draw_number = True
+                else:
+                    half_w = 25
+                    draw_number = False
+
+                painter.drawLine(QPointF(-half_w, y_pos), QPointF(half_w, y_pos))
+
+                if draw_number:
+                    label = str(abs(deg))
+                    painter.setPen(self._PITCH_LADDER_COLOR)
+                    painter.drawText(QRectF(-half_w - 30, y_pos - 8, 28, 16),
+                                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
+                    painter.drawText(QRectF(half_w + 2, y_pos - 8, 28, 16),
+                                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
+                    painter.setPen(QPen(self._PITCH_LADDER_COLOR, 1))
+
+            painter.restore()  # Fine rotazione
+
+            # Zero pitch reference line
+            painter.setPen(QPen(self._HORIZON_COLOR, 1.5, Qt.PenStyle.DashLine))
+            painter.drawLine(QPointF(cx - 80, cy), QPointF(cx + 80, cy))
+
+            painter.restore()  # Fine clipping
+
+            # --- 2. AIRSPEED TAPE ---
+            self._draw_airspeed_tape(painter, cx, cy, h)
+
+            # --- 3. ALTITUDE TAPE ---
+            self._draw_altitude_tape(painter, cx, cy, h)
+
+            # --- HEADING ARC (basso) ---
+            self._draw_heading_arc(painter, cx, cy, h)
+
+            # --- 4. AIRCRAFT SYMBOL ---
+            painter.save()
+            painter.translate(cx, cy)
+            painter.setPen(QPen(self._AIRCRAFT_SYMBOL_COLOR, 3))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawLine(QPointF(-60, 0), QPointF(-20, 0))
+            painter.drawLine(QPointF(20, 0), QPointF(60, 0))
+            painter.setBrush(self._AIRCRAFT_SYMBOL_COLOR)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(0, 0), 4, 4)
+            painter.restore()
+
+            # --- 5. BORESIGHT ---
+            painter.save()
+            painter.translate(cx, cy)
+            boresight_y = -h / 2 + 40
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(self._BORESIGHT_COLOR)
+            triangle = QPainterPath()
+            triangle.moveTo(0, boresight_y)
+            triangle.lineTo(-8, boresight_y - 12)
+            triangle.lineTo(8, boresight_y - 12)
+            triangle.closeSubpath()
+            painter.drawPath(triangle)
+            painter.restore()
+
+            # --- 6. ROLL INDICATOR ---
+            painter.save()
+            painter.translate(cx, cy)
+            arc_radius = h / 2 - 30
+            painter.setPen(QPen(self._HORIZON_COLOR, 1.5))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            arc_rect = QRectF(-arc_radius, -arc_radius, arc_radius * 2, arc_radius * 2)
+            painter.drawArc(arc_rect, 30 * 16, 120 * 16)
+            
+            roll_marks = [0, 10, 20, 30, 45, 60]
+            for angle in roll_marks:
+                signs = [1] if angle == 0 else [1, -1]
+                for sign in signs:
+                    deg = angle * sign
+                    painter.save()
+                    painter.rotate(deg)
+                    if angle == 0:
+                        tick_len = 12
+                        tick_w = 2
+                    elif angle in (10, 20, 30):
+                        tick_len = 8
+                        tick_w = 1.5
+                    else:
+                        tick_len = 10
+                        tick_w = 1.5
+                    painter.setPen(QPen(self._HORIZON_COLOR, tick_w))
+                    painter.drawLine(QPointF(0, -arc_radius), QPointF(0, -arc_radius + tick_len))
+                    painter.restore()
+            painter.restore()
+
+        except Exception as e:
+            # Gestione errori per evitare crash
+            print(f"Errore in paint_foreground: {e}")
+    
+    
+    # =========================================================================
+    # AIRSPEED TAPE CON PULSANTE UNITÀ
+    # =========================================================================
+
+    def _draw_airspeed_tape(self, painter: QPainter, cx: float, cy: float, h: float):
+        """Disegna la tape dell'airspeed con pulsante cambio unità."""
+        w = self._tape_width
+        left = 0
+        top = 0
+        
+        # Unità corrente e fattore di conversione
+        unit = self._current_unit()
+        factor = unit.factor  # es. 1.0 per M/S, 1.94384 per KNOTS
+        
+        # Valore convertito per la visualizzazione
+        airspeed_display = self._airspeed * factor
+        
+        # Scala adattata: mantieni la stessa scala fisica
+        px_per_display_unit = self._px_per_unit / factor
+        
+        # Offset per centrare il valore attuale al centro verticale
+        offset = cy - airspeed_display * px_per_display_unit
+        
+        # Sfondo nero semi-trasparente
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._TAPE_BG)
+        painter.drawRect(QRectF(left, top, w, h))
+        
+        # Bordo destro
+        painter.setPen(QPen(self._TAPE_BORDER, 1))
+        painter.drawLine(QPointF(w, top), QPointF(w, h))
+        
+        # Clip alla zona tape
+        clip_path = QPainterPath()
+        clip_path.addRect(QRectF(left, top, w, h))
+        painter.save()
+        painter.setClipPath(clip_path)
+        
+        # Tacche e numeri
+        font = painter.font()
+        font.setPixelSize(10)
+        font.setBold(True)
+        font.setFamily("Consolas")
+        painter.setFont(font)
+        
+        # Calcola range visibile
+        visible_range = (h / 2) / px_per_display_unit
+        start_val = int((airspeed_display - visible_range) / 5) * 5
+        end_val = int((airspeed_display + visible_range) / 5) * 5
+        
+        # Disegna le tacche
+        step = 5
+        for val in range(start_val, end_val + 1, step):
+            y = cy - (val - airspeed_display) * px_per_display_unit
+            
+            if y < top - 20 or y > h + 20:
+                continue
+            
+            is_major = (val % 10 == 0) and (val >= 0)
+            
+            if is_major:
+                # Tacca maggiore
+                painter.setPen(QPen(QColor(255, 255, 255), 2))
+                painter.drawLine(QPointF(w - 10, y), QPointF(w, y))
+                
+                # Numero
+                painter.setPen(QColor(255, 255, 255,100))
+                painter.drawText(QRectF(13, y - 10, w - 25, 20),
+                               Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                               str(val))
+            else:
+                # Tacca minore
+                painter.setPen(QPen(QColor(255, 255, 255, 150), 1))
+                painter.drawLine(QPointF(w - 10, y), QPointF(w, y))
+        
+        painter.restore()
+        
+        # Readout digitale AL CENTRO
+        readout_h = 35
+        readout_y = cy - readout_h / 2
+        painter.setPen(QPen(QColor(255, 255, 255), 2))
+        painter.setBrush(QColor(0, 0, 0, 220))
+        painter.drawRect(QRectF(5, readout_y, w - 10, readout_h))
+        
+        font.setPixelSize(15)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(QRectF(5, readout_y, w - 10, readout_h),
+                        Qt.AlignmentFlag.AlignCenter,
+                        f"{int(airspeed_display)}")
+        
+        # --- PULSANTE UNITÀ (sopra il readout) ---
+        btn_w = 36
+        btn_h = 16
+        btn_x = (w - btn_w) / 2
+        btn_y = h - btn_h - 8 
+        self._unit_btn_rect = QRectF(btn_x, btn_y, btn_w, btn_h)
+        
+        painter.setPen(QPen(self._UNIT_BTN_BORDER, 1.5))
+        painter.setBrush(self._UNIT_BTN_COLOR)
+        painter.drawRoundedRect(QRectF(btn_x, btn_y, btn_w, btn_h), 3, 3)
+        
+        font.setPixelSize(9)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 126, 0))
+        painter.drawText(QRectF(btn_x, btn_y, btn_w, btn_h),
+                        Qt.AlignmentFlag.AlignCenter, unit.label)
+        
+
+    # =========================================================================
+    # ALTITUDE TAPE
+    # =========================================================================
+
+    def _draw_altitude_tape(self, painter: QPainter, cx: float, cy: float, h: float):
+        """Disegna la tape dell'altitudine sul lato destro con pulsante cambio unità."""
+        w = self._tape_width + 10
+        left = self._prototype.width - w
+        top = 0
+        
+        # Unità corrente e fattore di conversione
+        unit = self._current_altitude_unit()
+        factor = unit.factor  # 1.0 per METERS, 3.28084 per FEET
+        
+        # Valore convertito per la visualizzazione
+        altitude_display = self._altitude * factor
+        
+        # Scala adattata
+        px_per_display_unit = self._px_per_foot / factor
+        
+        # Offset per centrare il valore attuale al centro verticale
+        offset = cy - altitude_display * px_per_display_unit
+        
+        # Sfondo nero semi-trasparente
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._TAPE_BG)
+        painter.drawRect(QRectF(left, top, w, h))
+        
+        # Bordo sinistro
+        painter.setPen(QPen(self._TAPE_BORDER, 1))
+        painter.drawLine(QPointF(left, top), QPointF(left, h))
+        
+        # Clip alla zona tape
+        clip_path = QPainterPath()
+        clip_path.addRect(QRectF(left, top, w, h))
+        painter.save()
+        painter.setClipPath(clip_path)
+        
+        # Tacche e numeri
+        font = painter.font()
+        font.setPixelSize(12)
+        font.setBold(True)
+        font.setFamily("Consolas")
+        painter.setFont(font)
+        
+        # Calcola range visibile
+        visible_range = (h / 2) / px_per_display_unit
+        start_val = int((altitude_display - visible_range) / 50) * 50
+        end_val = int((altitude_display + visible_range) / 50) * 50
+        
+        # Disegna da start_val a end_val
+        for val in range(start_val, end_val + 1, 50):
+            y = cy - (val - altitude_display) * px_per_display_unit
+            
+            if y < top - 20 or y > h + 20:
+                continue
+            
+            is_major = (val % 100 == 0) and (val >= 0)
+            
+            if is_major:
+                # Tacca maggiore
+                painter.setPen(QPen(QColor(255, 255, 255), 2))
+                painter.drawLine(QPointF(left, y), QPointF(left + 10, y))
+                
+                # Numero
+                painter.setPen(QColor(255, 255, 255,100))
+                painter.drawText(QRectF(left + 12, y - 10, w - 27, 20),
+                               Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                               str(val))
+            else:
+                # Tacca minore
+                painter.setPen(QPen(QColor(255, 255, 255, 150), 1))
+                painter.drawLine(QPointF(left, y), QPointF(left + 10, y))
+        
+        painter.restore()
+        
+        # Readout digitale AL CENTRO
+        readout_h = 35
+        readout_y = cy - readout_h / 2
+        painter.setPen(QPen(QColor(255, 255, 255), 2))
+        painter.setBrush(QColor(0, 0, 0, 220))
+        painter.drawRect(QRectF(left + 5, readout_y, w - 10, readout_h))
+        
+        font.setPixelSize(15)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(QRectF(left + 5, readout_y, w - 10, readout_h),
+                        Qt.AlignmentFlag.AlignCenter,
+                        f"{int(altitude_display)}")
+        
+        # --- PULSANTE UNITÀ IN BASSO (al posto dell'etichetta) ---
+        btn_w = 40
+        btn_h = 16
+        btn_x = left + (w - btn_w) / 2
+        btn_y = h - btn_h - 8
+        self._altitude_btn_rect = QRectF(btn_x, btn_y, btn_w, btn_h)
+        
+        painter.setPen(QPen(QColor(255, 126, 0), 1.5))
+        painter.setBrush(QColor(40, 40, 45, 220))
+        painter.drawRoundedRect(QRectF(btn_x, btn_y, btn_w, btn_h), 3, 3)
+        
+        font.setPixelSize(9)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 126, 0))
+        painter.drawText(QRectF(btn_x, btn_y, btn_w, btn_h),
+                        Qt.AlignmentFlag.AlignCenter, unit.label)
+
+
+    # =========================================================================
+    # HEADING INDICATOR
+    # =========================================================================
+
+
+    def _draw_heading_arc(self, painter: QPainter, cx: float, cy: float, h: float):
+        """Arco bussola in basso. Autonomo: disattiva il clip, quantizza, normalizza il wrap."""
+        painter.save()
+        painter.setClipping(False)          # ← nessuna eredità di clip dalle tape/attitude
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        r_out = float(self._hdg_radius)
+        band  = float(self._hdg_band)
+        r_in  = r_out - band
+        span  = float(self._hdg_span)
+        arc_cx = float(cx)
+        arc_cy = float(h) + float(self._hdg_center_below)   # centro fuori dal bordo basso
+
+        # In Qt: 0°=3 o'clock, CCW+, 90°=alto. rel=0 -> alto (sotto il lubber).
+        start_qt = 90.0 - span
+        span_qt  = 2.0 * span
+
+        # --- Banda (tratto spesso, capi piatti) ---
+        mid_r = (r_out + r_in) / 2.0
+        rect_mid = QRectF(arc_cx - mid_r, arc_cy - mid_r, mid_r * 2, mid_r * 2)
+        painter.setPen(QPen(QColor(0, 0, 0, 190), band,
+                            Qt.PenStyle.SolidLine,
+                            Qt.PenCapStyle.FlatCap, Qt.PenJoinStyle.BevelJoin))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawArc(rect_mid, int(start_qt * 16), int(span_qt * 16))
+
+        # --- Bordi banda ---
+        painter.setPen(QPen(QColor(255, 255, 255, 90), 1))
+        for rr in (r_out, r_in):
+            rect = QRectF(arc_cx - rr, arc_cy - rr, rr * 2, rr * 2)
+            painter.drawArc(rect, int(start_qt * 16), int(span_qt * 16))
+
+        # --- Tacche e numeri ---
+        font = painter.font()
+        font.setFamily("Consolas")
+        font.setBold(True)
+        font.setPixelSize(14)
+        painter.setFont(font)
+
+        hdg = self._heading % 360.0
+        # ciclo su multipli di 5 attorno a hdg (deg può uscire da 0..360: il %360 normalizza la label)
+        first = int(math.floor((hdg - span) / 5.0)) * 5
+        last  = int(math.ceil((hdg + span) / 5.0)) * 5
+
+        for deg in range(first, last + 1, 5):
+            rel = deg - hdg
+            if abs(rel) > span:
+                continue
+            rad = math.radians(90.0 - rel)
+            ux = math.cos(rad)
+            uy = -math.sin(rad)             # y schermo: 90° -> -1 (alto)
+
+            ox = arc_cx + r_out * ux
+            oy = arc_cy + r_out * uy
+            ix, iy = -ux, -uy               # verso il centro dell'arco
+
+            is_major = (deg % 10 == 0)
+            tick = 16.0 if is_major else 9.0
+            pen_w = 2.0 if is_major else 1.2
+
+            painter.setPen(QPen(QColor(255, 255, 255), pen_w))
+            painter.drawLine(
+                QPointF(round(ox), round(oy)),
+                QPointF(round(ox + ix * tick), round(oy + iy * tick)),
+            )
+
+            if is_major:
+                d3 = deg % 360
+                if d3 == 0:
+                    label, col = "N", QColor(255, 70, 70)
+                elif d3 == 90:
+                    label, col = "E", QColor(255, 255, 255)
+                elif d3 == 180:
+                    label, col = "S", QColor(255, 255, 255)
+                elif d3 == 270:
+                    label, col = "W", QColor(255, 255, 255)
+                else:
+                    label, col = str(d3), QColor(255, 255, 255)
+
+                tx = round(arc_cx + (r_out - 40.0) * ux)
+                ty = round(arc_cy + (r_out - 40.0) * uy)
+                painter.setPen(col)
+                painter.drawText(QRectF(tx - 18, ty - 9, 36, 18),
+                                 Qt.AlignmentFlag.AlignCenter, label)
+
+        # --- Lubber pointer (ambra) ---
+        tip_y = round(arc_cy - r_out)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(255, 180, 0))
+        tri = QPainterPath()
+        tri.moveTo(arc_cx, tip_y + 2)
+        tri.lineTo(arc_cx - 8, tip_y - 12)
+        tri.lineTo(arc_cx + 8, tip_y - 12)
+        tri.closeSubpath()
+        painter.drawPath(tri)
+
+        # --- Readout digitale ---
+        box_w, box_h = 56, 26
+        box_x = round(arc_cx - box_w / 2)
+        box_y = tip_y - 12 - box_h - 2
+        painter.setPen(QPen(QColor(255, 255, 255), 1.5))
+        painter.setBrush(QColor(0, 0, 0, 230))
+        painter.drawRoundedRect(QRectF(box_x, box_y, box_w, box_h), 3, 3)
+        font.setPixelSize(16)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(QRectF(box_x, box_y, box_w, box_h),
+                         Qt.AlignmentFlag.AlignCenter, f"{int(hdg):03d}")
+
+        painter.restore()
+
+
+
+
+
+
+
+
+
+

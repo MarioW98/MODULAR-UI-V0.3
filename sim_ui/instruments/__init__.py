@@ -22,7 +22,7 @@ from .professional import (
     AltimeterProfessional,
     VSIGaugeProfessional, TurnCoordinatorProfessional,
 )
-from .advance_instr import AttitudeAdvance
+from .advance_instr import AttitudeAdvance, PrimaryFlightDisplay
 from .comfort_instr import (
     AirspeedComfort, AltimeterComfort, VSIComfort, 
     HeadingComfort, TurnCoordinatorComfort,

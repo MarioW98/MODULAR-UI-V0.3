@@ -91,6 +91,9 @@ def build_default_registry() -> InstrumentRegistry:
     r.register(InstrumentPrototype("adv-sq-attitude", "Attitude AdvanceSq", "Avanzati",
                                    240, 240, "#00695C",
                                    "Orizzonte artificiale avanzato",style="Advance"))
+    r.register(InstrumentPrototype("adv-pfd", "Primary Flight Display", "Avanzati",
+                                   960, 720, "#143C8C",
+                                   "PFD stile Gulfstream G500/G600", style="Advance"))
     # --- Comfort (anti-affaticamento visivo) ---
     r.register(InstrumentPrototype("comfort-airspeed", "Airspeed Comfort", "Comfort",
                                    200, 200, "#FF7E00",

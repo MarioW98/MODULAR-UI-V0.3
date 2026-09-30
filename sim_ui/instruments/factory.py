@@ -28,7 +28,7 @@ class InstrumentFactory:
             VSIGaugeProfessional,
             TurnCoordinatorProfessional,
         )
-        from .advance_instr import AttitudeAdvance
+        from .advance_instr import AttitudeAdvance, PrimaryFlightDisplay
         from .comfort_instr import (
             AirspeedComfort, AltimeterComfort, VSIComfort,
             HeadingComfort, TurnCoordinatorComfort,
@@ -60,6 +60,7 @@ class InstrumentFactory:
             "flight-turn-coord-pro": TurnCoordinatorProfessional,
             # --- Advanced ---
             "adv-sq-attitude": AttitudeAdvance,
+            "adv-pfd": PrimaryFlightDisplay,
             # --- Comfort ---
             "comfort-airspeed": AirspeedComfort,
             "comfort-altimeter": AltimeterComfort,

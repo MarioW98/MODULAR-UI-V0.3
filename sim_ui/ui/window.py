@@ -118,6 +118,12 @@ class MainWindow(QMainWindow):
         self._opengl_enabled = not self._opengl_enabled
         self._view.set_opengl(self._opengl_enabled)
 
+        # Invalida la cache di rendering di ogni strumento
+        for item in self._all_instruments():
+            if hasattr(item, "_bg_cache"):
+                item._bg_cache = None
+            item.update()
+
         # Forza redraw completo
         self._scene.invalidate()
         self._view.viewport().update()
@@ -125,11 +131,17 @@ class MainWindow(QMainWindow):
         state = "ON" if self._opengl_enabled else "OFF"
         self.statusBar().showMessage(f"OpenGL: {state}", 3000)
 
-        # Aggiorna checkbox nel menu
         if hasattr(self, '_act_opengl'):
             self._act_opengl.blockSignals(True)
             self._act_opengl.setChecked(self._opengl_enabled)
             self._act_opengl.blockSignals(False)
+
+        if hasattr(self, '_act_opengl'):
+            self._act_opengl.blockSignals(True)
+            self._act_opengl.setChecked(self._opengl_enabled)
+            self._act_opengl.blockSignals(False)
+
+
 
     def _set_target_fps(self, fps: int):
         """Imposta la frequenza target per la telemetria mock."""
