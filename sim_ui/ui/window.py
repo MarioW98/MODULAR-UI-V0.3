@@ -323,28 +323,6 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Modalità editing", 3000)
 
 
-    def _exit_preview(self):
-        """Esce dalla modalità preview e torna all'editing."""
-        self._preview_mode = False
-
-        # Ripristina griglia/snap se era attivo
-        if self._snap_enabled:
-            self._scene.set_snap_enabled(True)
-
-        # Mostra Hangar e toolbar
-        self._hangar.show()
-        self._edit_toolbar.show()
-
-        # Ripristina interazione sugli strumenti
-        for item in self._all_instruments():
-            item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
-            item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-
-        # Ripristina rubber band
-        self._view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-
-        self._update_status_bar()
-        self.statusBar().showMessage("Modalità editing", 3000)
 
     # =========================================================================
     # TELEMETRIA
@@ -748,7 +726,7 @@ class MainWindow(QMainWindow):
 
     def _z_front(self):
         sel = self._selected_instruments()
-        if not sel: returnF
+        if not sel: return
         mz = max((i.zValue() for i in self._all_instruments()), default=0)
         for idx, it in enumerate(sel): it.setZValue(mz+1+idx)
         self._scene.update()
