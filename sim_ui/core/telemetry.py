@@ -27,8 +27,11 @@ class TelemetryData:
 
 class TelemetryAdapter(QObject):
     telemetry_updated = Signal(TelemetryData)
-
-    def start(self): pass
+    # Firma con default: gli adapter derivati possono aggiungere parametri
+    # opzionali (es. MockTelemetryAdapter.start(interval_ms)) restando
+    # conformi al principio LSP — ogni chiamata `adapter.start()` valida
+    # sulla base resta valida su qualsiasi sottoclasse.
+    def start(self, interval_ms: int | None = None): pass
     def stop(self): pass
 
 

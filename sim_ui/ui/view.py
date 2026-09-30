@@ -73,7 +73,10 @@ class InstrumentGraphicsView(QGraphicsView):
         super().__init__(scene, parent)
 
         self.setAcceptDrops(True)
-        self.viewport().installEventFilter(self)
+        # Referenza al viewport corrente: il filtro eventi va re-installato
+        # ogni volta che setViewport() sostituisce il widget (toggle OpenGL).
+        self._viewport_widget = self.viewport()
+        self._viewport_widget.installEventFilter(self)
 
         # Rubber band per selezione multipla
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
@@ -318,30 +321,26 @@ class InstrumentGraphicsView(QGraphicsView):
         Attiva/disattiva rendering OpenGL.
         Dopo il cambio viewport ricreo sempre l'overlay dei righelli.
         """
-        if enabled and OPENGL_AVAILABLE:
-            from PySide6.QtGui import QSurfaceFormat
+        if not OPENGL_AVAILABLE or self.is_opengl():
+            return
+        from PySide6.QtGui import QSurfaceFormat
 
-            fmt = QSurfaceFormat()
-            fmt.setSamples(4)
-            fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
+        fmt = QSurfaceFormat()
+        fmt.setSamples(4)
+        fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
 
-            gl_widget = QOpenGLWidget()
-            gl_widget.setFormat(fmt)
-            self.setViewport(gl_widget)
+        gl_widget = QOpenGLWidget()
+        gl_widget.setFormat(fmt)
+        self.setViewport(gl_widget)
 
-            # OpenGL richiede ridisegno completo
-            self.setViewportUpdateMode(
-                QGraphicsView.ViewportUpdateMode.FullViewportUpdate
-            )
-            self.setCacheMode(QGraphicsView.CacheModeFlag.CacheNone)
 
-        else:
-            self.setViewport(None)
+        self._viewport_widget = self.viewport()
+        self._viewport_widget.installEventFilter(self)
 
-            self.setViewportUpdateMode(
+        self.setViewportUpdateMode(
                 QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate
             )
-            self.setCacheMode(QGraphicsView.CacheModeFlag.CacheNone)
+        self.setCacheMode(QGraphicsView.CacheModeFlag.CacheNone)
 
         # Reinstalla event filter e mouse tracking sul nuovo viewport
         self.viewport().installEventFilter(self)

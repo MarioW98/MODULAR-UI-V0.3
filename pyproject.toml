@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sim-ui"
+version = "0.3.0"
+description = "Flight Simulator MODULAR UI V0.3 - dashboard modulare di strumenti per simulatore (layer GUI, PySide6)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "PySide6>=6.5.0",
+]
+
+[project.scripts]
+sim-ui = "sim_ui.main:main"
+
+[tool.setuptools.packages.find]
+include = ["sim_ui*"]

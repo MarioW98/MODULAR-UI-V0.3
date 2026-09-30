@@ -115,8 +115,11 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self._opengl_enabled = not self._opengl_enabled
-        self._view.set_opengl(self._opengl_enabled)
+        if self._view.is_opengl():
+            self.statusBar().showMessage("OpenGL già attivato",4000)
+            return
+        self._opengl_enabled = True
+        self._view.set_opengl(True)
 
         # Invalida la cache di rendering di ogni strumento
         for item in self._all_instruments():
@@ -133,7 +136,8 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, '_act_opengl'):
             self._act_opengl.blockSignals(True)
-            self._act_opengl.setChecked(self._opengl_enabled)
+            self._act_opengl.setChecked(True)
+            self._view.setEnabled(False)
             self._act_opengl.blockSignals(False)
 
         if hasattr(self, '_act_opengl'):
@@ -754,9 +758,10 @@ class MainWindow(QMainWindow):
         if self._preview_mode:
             return
         for it in self._selected_instruments():
-            it.setSelected(False); self._scene.removeItem(it); it.deleteLater()
+            it.setSelected(False)
+            self._scene.removeItem(it)
+            it.deleteLater()
         self._invalidate_instrument_cache()
-        self._invalidate_instrument_cache() 
         self._update_status_bar()
 
     def _clear_all(self):
@@ -765,16 +770,16 @@ class MainWindow(QMainWindow):
             it.deleteLater()
         self._scene.clearSelection()
         self._spawn_index = 0
-        self._invalidate_instrument_cache()      # ← DEVE esserci
+        self._invalidate_instrument_cache()
         self._update_status_bar()
 
-    def delete_selected(self):
-        for it in self._selected_instruments():
-            it.setSelected(False)
-            self._scene.removeItem(it)
-            it.deleteLater()
-        self._invalidate_instrument_cache()      # ← DEVE esserci
-        self._update_status_bar()
+    # def delete_selected(self):
+    #     for it in self._selected_instruments():
+    #         it.setSelected(False)
+    #         self._scene.removeItem(it)
+    #         it.deleteLater()
+    #     self._invalidate_instrument_cache()      # ← DEVE esserci
+    #     self._update_status_bar()
 
     # =========================================================================
     # PERSISTENZA
@@ -806,7 +811,11 @@ class MainWindow(QMainWindow):
         }
     
     def _deserialize(self, data):
-        if data.get("schema_version", 0) > LAYOUT_SCHEMA_VERSION: return False
+        try:
+            version = int(data.get("schema_version", 0))
+        except (ValueError, TypeError):
+            return False
+        if version > LAYOUT_SCHEMA_VERSION: return False  # Versione futura non supportata
         self._clear_all(); self._snap_enabled = False
 
         # Ripristina il tema salvato
