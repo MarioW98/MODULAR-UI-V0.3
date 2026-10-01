@@ -8,6 +8,23 @@ from .base import BaseInstrument
 from ..core.telemetry import TelemetryData
 
 
+_BEZEL_COLOR = QColor(40, 40, 45)
+_BEZEL_RING_COLOR = QColor(30, 30, 34)
+_DIAL_COLOR = QColor(20, 22, 28)
+_TICK_MAJOR_COLOR = QColor(220, 220, 220)
+_TICK_MINOR_COLOR = QColor(160, 160, 160)
+_TICK_MAJOR_WIDTH = 2.0
+_TICK_MINOR_WIDTH = 1.0
+_SKY_COLOR = QColor(55, 110, 190)
+_GROUND_COLOR = QColor(120, 75, 35)
+_HORIZON_COLOR = QColor(255, 255, 255)
+_PITCH_LADDER_COLOR = QColor(255, 255, 255)
+_NEEDLE_COLOR = QColor(255, 255, 255)
+_REFERENCE_COLOR = QColor(255, 160, 0)
+_AIRCRAFT_SYMBOL_COLOR = QColor(255, 200, 0)
+_FONT_SIZE_UNIT = 9
+
+
 # =============================================================================
 # ATTITUDE INDICATOR (semplice)
 # =============================================================================
@@ -24,18 +41,16 @@ class AttitudeIndicator(BaseInstrument):
         self.update()
 
     def paint_background(self, p: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         outer_r = min(cx, cy) - 4
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.bezel_color)
+        p.setBrush(_BEZEL_COLOR)
         p.drawEllipse(QPointF(cx, cy), outer_r, outer_r)
-        p.setBrush(th.dial_color)
+        p.setBrush(_DIAL_COLOR)
         p.drawEllipse(QPointF(cx, cy), outer_r - 6, outer_r - 6)
 
     def paint_foreground(self, p: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         radius = min(cx, cy) - 12
@@ -49,14 +64,14 @@ class AttitudeIndicator(BaseInstrument):
 
         ppx = self._pitch * 2.5
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.sky_color)
+        p.setBrush(_SKY_COLOR)
         p.drawRect(QRectF(-radius * 2, -radius * 2 + ppx, radius * 4, radius * 2))
-        p.setBrush(th.ground_color)
+        p.setBrush(_GROUND_COLOR)
         p.drawRect(QRectF(-radius * 2, ppx, radius * 4, radius * 2))
-        p.setPen(QPen(th.horizon_color, 2))
+        p.setPen(QPen(_HORIZON_COLOR, 2))
         p.drawLine(QPointF(-radius, ppx), QPointF(radius, ppx))
 
-        p.setPen(QPen(th.pitch_ladder_color, 1))
+        p.setPen(QPen(_PITCH_LADDER_COLOR, 1))
         for deg in [-20, -10, 10, 20]:
             yo = ppx - deg * 2.5
             hw = 20 if deg % 20 == 0 else 14
@@ -65,10 +80,10 @@ class AttitudeIndicator(BaseInstrument):
 
         p.save()
         p.translate(cx, cy)
-        p.setPen(QPen(th.aircraft_symbol_color, 3))
+        p.setPen(QPen(_AIRCRAFT_SYMBOL_COLOR, 3))
         p.drawLine(QPointF(-28, 0), QPointF(-10, 0))
         p.drawLine(QPointF(10, 0), QPointF(28, 0))
-        p.setBrush(th.aircraft_symbol_color)
+        p.setBrush(_AIRCRAFT_SYMBOL_COLOR)
         p.setPen(Qt.PenStyle.NoPen)
         p.drawEllipse(QPointF(0, 0), 3, 3)
         p.restore()
@@ -81,10 +96,9 @@ class AttitudeIndicator(BaseInstrument):
         tri.lineTo(5, -radius + 10)
         tri.closeSubpath()
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.aircraft_symbol_color)
+        p.setBrush(_AIRCRAFT_SYMBOL_COLOR)
         p.drawPath(tri)
         p.restore()
-
 
 # =============================================================================
 # ATTITUDE INDICATOR FULL
@@ -111,17 +125,16 @@ class AttitudeIndicatorFull(BaseInstrument):
         self.update()
 
     def paint_background(self, painter: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         outer_r = min(cx, cy) - 4
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.bezel_color)
+        painter.setBrush(_BEZEL_COLOR)
         painter.drawEllipse(QPointF(cx, cy), outer_r, outer_r)
-        painter.setBrush(th.bezel_ring_color)
+        painter.setBrush(_BEZEL_RING_COLOR)
         painter.drawEllipse(QPointF(cx, cy), outer_r - 4, outer_r - 4)
         dial_r = outer_r - 8
-        painter.setBrush(th.dial_color)
+        painter.setBrush(_DIAL_COLOR)
         painter.drawEllipse(QPointF(cx, cy), dial_r, dial_r)
 
         roll_marks = [0, 10, 20, 30, 45, 60]
@@ -134,17 +147,16 @@ class AttitudeIndicatorFull(BaseInstrument):
                 painter.translate(cx, cy)
                 painter.rotate(deg)
                 if angle == 0:
-                    tick_len, tick_w = 12, th.tick_major_width
+                    tick_len, tick_w = 12, _TICK_MAJOR_WIDTH
                 elif angle in (10, 20, 30):
-                    tick_len, tick_w = 10, th.tick_minor_width
+                    tick_len, tick_w = 10, _TICK_MINOR_WIDTH
                 else:
-                    tick_len, tick_w = 12, th.tick_minor_width
-                painter.setPen(QPen(th.tick_major_color, tick_w))
+                    tick_len, tick_w = 12, _TICK_MINOR_WIDTH
+                painter.setPen(QPen(_TICK_MAJOR_COLOR, tick_w))
                 painter.drawLine(QPointF(0, -tick_r), QPointF(0, -tick_r + tick_len))
                 painter.restore()
 
     def paint_foreground(self, painter: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         outer_r = min(cx, cy) - 4
@@ -162,18 +174,18 @@ class AttitudeIndicatorFull(BaseInstrument):
 
         pitch_offset = self._pitch * self._px_per_deg
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.sky_color)
+        painter.setBrush(_SKY_COLOR)
         painter.drawRect(QRectF(-sphere_r * 2, -sphere_r * 2 + pitch_offset,
                                 sphere_r * 4, sphere_r * 2))
-        painter.setBrush(th.ground_color)
+        painter.setBrush(_GROUND_COLOR)
         painter.drawRect(QRectF(-sphere_r * 2, pitch_offset,
                                 sphere_r * 4, sphere_r * 2))
-        painter.setPen(QPen(th.horizon_color, 2))
+        painter.setPen(QPen(_HORIZON_COLOR, 2))
         painter.drawLine(QPointF(-sphere_r, pitch_offset),
                          QPointF(sphere_r, pitch_offset))
 
         pf = painter.font()
-        pf.setPixelSize(th.font_size_unit)
+        pf.setPixelSize(_FONT_SIZE_UNIT)
         painter.setFont(pf)
         for deg in range(-30, 35, 5):
             if deg == 0:
@@ -185,11 +197,11 @@ class AttitudeIndicatorFull(BaseInstrument):
             else:
                 half_w = 18
                 draw_number = False
-            painter.setPen(QPen(th.pitch_ladder_color, 1))
+            painter.setPen(QPen(_PITCH_LADDER_COLOR, 1))
             painter.drawLine(QPointF(-half_w, y_pos), QPointF(half_w, y_pos))
             if draw_number:
                 label = str(abs(deg))
-                painter.setPen(th.pitch_ladder_color)
+                painter.setPen(_PITCH_LADDER_COLOR)
                 painter.drawText(QRectF(-half_w - 22, y_pos - 6, 20, 12),
                                  Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                                  label)
@@ -208,7 +220,7 @@ class AttitudeIndicatorFull(BaseInstrument):
         ptr.lineTo(6, -ptr_r + 12)
         ptr.closeSubpath()
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.needle_color)
+        painter.setBrush(_NEEDLE_COLOR)
         painter.drawPath(ptr)
         painter.restore()
 
@@ -221,22 +233,21 @@ class AttitudeIndicatorFull(BaseInstrument):
         ref.lineTo(5, -ref_r + 2)
         ref.closeSubpath()
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.reference_color)
+        painter.setBrush(_REFERENCE_COLOR)
         painter.drawPath(ref)
         painter.restore()
 
         painter.save()
         painter.translate(cx, cy)
-        painter.setPen(QPen(th.aircraft_symbol_color, 3))
+        painter.setPen(QPen(_AIRCRAFT_SYMBOL_COLOR, 3))
         painter.drawLine(QPointF(-30, 0), QPointF(-12, 0))
         painter.drawLine(QPointF(12, 0), QPointF(30, 0))
         painter.drawLine(QPointF(-30, 0), QPointF(-30, 5))
         painter.drawLine(QPointF(30, 0), QPointF(30, 5))
-        painter.setBrush(th.aircraft_symbol_color)
+        painter.setBrush(_AIRCRAFT_SYMBOL_COLOR)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(0, 0), 3, 3)
         painter.restore()
-
 
 # =============================================================================
 # ATTITUDE INDICATOR SQUARE
@@ -262,25 +273,23 @@ class AttitudeIndicatorSquare(BaseInstrument):
         self.update()
 
     def paint_background(self, painter: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         margin = 4
         corner = 12
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.bezel_color)
+        painter.setBrush(_BEZEL_COLOR)
         painter.drawRoundedRect(QRectF(margin, margin, w - 2 * margin, h - 2 * margin),
                                 corner, corner)
         m2 = margin + 4
-        painter.setBrush(th.bezel_ring_color)
+        painter.setBrush(_BEZEL_RING_COLOR)
         painter.drawRoundedRect(QRectF(m2, m2, w - 2 * m2, h - 2 * m2),
                                 corner - 2, corner - 2)
         m3 = margin + 8
-        painter.setBrush(th.dial_color)
+        painter.setBrush(_DIAL_COLOR)
         painter.drawRoundedRect(QRectF(m3, m3, w - 2 * m3, h - 2 * m3),
                                 corner - 4, corner - 4)
 
     def paint_foreground(self, painter: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         dial_margin = 12
@@ -309,26 +318,26 @@ class AttitudeIndicatorSquare(BaseInstrument):
             h_sec = h0 + half_period
 
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.sky_color)
+        painter.setBrush(_SKY_COLOR)
         painter.drawRect(QRectF(-large, -large, large * 2, large + h0))
-        painter.setBrush(th.ground_color)
+        painter.setBrush(_GROUND_COLOR)
         painter.drawRect(QRectF(-large, h0, large * 2, large))
 
         if norm_pitch >= 0 and h_sec > -large:
-            painter.setBrush(th.ground_color)
+            painter.setBrush(_GROUND_COLOR)
             painter.drawRect(QRectF(-large, -large, large * 2, large + h_sec))
         elif norm_pitch < 0 and h_sec < large:
-            painter.setBrush(th.sky_color)
+            painter.setBrush(_SKY_COLOR)
             painter.drawRect(QRectF(-large, h_sec, large * 2, large))
 
-        painter.setPen(QPen(th.horizon_color, 2))
+        painter.setPen(QPen(_HORIZON_COLOR, 2))
         painter.drawLine(QPointF(-large, h0), QPointF(large, h0))
         if -large < h_sec < large:
-            painter.setPen(QPen(th.horizon_color, 2))
+            painter.setPen(QPen(_HORIZON_COLOR, 2))
             painter.drawLine(QPointF(-large, h_sec), QPointF(large, h_sec))
 
         pf = painter.font()
-        pf.setPixelSize(th.font_size_unit)
+        pf.setPixelSize(_FONT_SIZE_UNIT)
         painter.setFont(pf)
         for deg in range(-170, 175, 5):
             if deg == 0:
@@ -340,11 +349,11 @@ class AttitudeIndicatorSquare(BaseInstrument):
             else:
                 half_w = 16
                 draw_number = False
-            painter.setPen(QPen(th.pitch_ladder_color, 1))
+            painter.setPen(QPen(_PITCH_LADDER_COLOR, 1))
             painter.drawLine(QPointF(-half_w, y_pos), QPointF(half_w, y_pos))
             if draw_number:
                 label = str(abs(deg))
-                painter.setPen(th.pitch_ladder_color)
+                painter.setPen(_PITCH_LADDER_COLOR)
                 painter.drawText(QRectF(-half_w - 24, y_pos - 6, 22, 12),
                                  Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                                  label)
@@ -354,14 +363,14 @@ class AttitudeIndicatorSquare(BaseInstrument):
 
         for deg in [-90, 90]:
             y_pos = pitch_offset - deg * ppd
-            painter.setPen(QPen(th.reference_color, 2))
+            painter.setPen(QPen(_REFERENCE_COLOR, 2))
             painter.drawLine(QPointF(-40, y_pos), QPointF(40, y_pos))
         painter.restore()
 
         arc_r = min(dial_w, dial_h) / 2 - 8
         painter.save()
         painter.translate(cx, cy)
-        painter.setPen(QPen(th.tick_minor_color, 1))
+        painter.setPen(QPen(_TICK_MINOR_COLOR, 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         arc_rect = QRectF(-arc_r, -arc_r, arc_r * 2, arc_r * 2)
         painter.drawArc(arc_rect, 20 * 16, 140 * 16)
@@ -376,14 +385,14 @@ class AttitudeIndicatorSquare(BaseInstrument):
                 painter.translate(cx, cy)
                 painter.rotate(deg)
                 if angle == 0:
-                    tick_len, tick_w = 14, th.tick_major_width
-                    tick_color = th.tick_major_color
+                    tick_len, tick_w = 14, _TICK_MAJOR_WIDTH
+                    tick_color = _TICK_MAJOR_COLOR
                 elif angle in (10, 20, 30):
-                    tick_len, tick_w = 10, th.tick_minor_width
-                    tick_color = th.tick_major_color
+                    tick_len, tick_w = 10, _TICK_MINOR_WIDTH
+                    tick_color = _TICK_MAJOR_COLOR
                 else:
-                    tick_len, tick_w = 12, th.tick_minor_width
-                    tick_color = th.tick_major_color
+                    tick_len, tick_w = 12, _TICK_MINOR_WIDTH
+                    tick_color = _TICK_MAJOR_COLOR
                 painter.setPen(QPen(tick_color, tick_w))
                 painter.drawLine(QPointF(0, -arc_r), QPointF(0, -arc_r + tick_len))
                 painter.restore()
@@ -398,7 +407,7 @@ class AttitudeIndicatorSquare(BaseInstrument):
         ptr.lineTo(6, -ptr_r + 12)
         ptr.closeSubpath()
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.needle_color)
+        painter.setBrush(_NEEDLE_COLOR)
         painter.drawPath(ptr)
         painter.restore()
 
@@ -411,18 +420,23 @@ class AttitudeIndicatorSquare(BaseInstrument):
         ref.lineTo(5, -ref_r + 2)
         ref.closeSubpath()
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(th.reference_color)
+        painter.setBrush(_REFERENCE_COLOR)
         painter.drawPath(ref)
         painter.restore()
 
         painter.save()
         painter.translate(cx, cy)
-        painter.setPen(QPen(th.aircraft_symbol_color, 3))
+        painter.setPen(QPen(_AIRCRAFT_SYMBOL_COLOR, 3))
         painter.drawLine(QPointF(-30, 0), QPointF(-12, 0))
         painter.drawLine(QPointF(12, 0), QPointF(30, 0))
         painter.drawLine(QPointF(-30, 0), QPointF(-30, 5))
         painter.drawLine(QPointF(30, 0), QPointF(30, 5))
-        painter.setBrush(th.aircraft_symbol_color)
+        painter.setBrush(_AIRCRAFT_SYMBOL_COLOR)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(0, 0), 3, 3)
         painter.restore()
+
+
+
+
+

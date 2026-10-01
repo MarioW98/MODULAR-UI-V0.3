@@ -9,6 +9,20 @@ from ..core.telemetry import TelemetryData
 
 
 class CircularGauge(BaseInstrument):
+    # Palette interna dello strumento (non dipende dal tema)
+    _BEZEL_COLOR = QColor(40, 40, 45)
+    _BEZEL_RING_COLOR = QColor(30, 30, 34)
+    _DIAL_COLOR = QColor(20, 22, 28)
+    _TICK_MAJOR_COLOR = QColor(220, 220, 220)
+    _TICK_MINOR_COLOR = QColor(160, 160, 160)
+    _TICK_MAJOR_WIDTH = 2.0
+    _TICK_MINOR_WIDTH = 1.0
+    _TEXT_COLOR = QColor(220, 220, 220)
+    _TEXT_SECONDARY_COLOR = QColor(180, 190, 200)
+    _TEXT_TERTIARY_COLOR = QColor(140, 150, 160)
+    _NEEDLE_COLOR = QColor(255, 255, 255)
+    _NEEDLE_HUB_COLOR = QColor(90, 90, 95)
+
     def __init__(self, proto, parent=None):
         super().__init__(proto, parent)
         self._value = 0.0
@@ -27,112 +41,86 @@ class CircularGauge(BaseInstrument):
         pass
 
     def paint_background(self, p):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         outer_r = min(cx, cy) - 4
 
         # Bezel
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.bezel_color)
+        p.setBrush(self._BEZEL_COLOR)
         p.drawEllipse(QPointF(cx, cy), outer_r, outer_r)
 
         # Quadrante
         dial_r = outer_r - 6
-        p.setBrush(th.dial_color)
+        p.setBrush(self._DIAL_COLOR)
+        p.setPen(QPen(self._BEZEL_RING_COLOR, 3))
         p.drawEllipse(QPointF(cx, cy), dial_r, dial_r)
 
+        # Tacche e numeri
         tick_outer = dial_r - 4
-        major_len = 14
-        minor_len = 8
-        label_r = tick_outer - major_len - 12
         nm = int((self._max_val - self._min_val) / self._major_step) + 1
-
         for i in range(nm):
             val = self._min_val + i * self._major_step
             rot = self.value_to_rotation(val)
-
-            # Tacca maggiore
             p.save()
             p.translate(cx, cy)
             p.rotate(rot)
-            p.setPen(QPen(th.tick_major_color, th.tick_major_width))
-            p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + major_len))
+            p.setPen(QPen(self._TICK_MAJOR_COLOR, self._TICK_MAJOR_WIDTH))
+            p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + 14))
             p.restore()
 
             # Numero
             rad = math.radians(rot)
-            lx = cx + label_r * math.sin(rad)
-            ly = cy - label_r * math.cos(rad)
-            p.setPen(th.text_color)
-            lf = p.font()
-            if th.font_family:
-                lf.setFamily(th.font_family)
-            lf.setPixelSize(th.font_size_numbers)
-            p.setFont(lf)
-            p.drawText(QRectF(lx - 20, ly - 8, 40, 16),
-                       Qt.AlignmentFlag.AlignCenter,
-                       self._label_format.format(val))
+            lx = cx + (tick_outer - 22) * math.sin(rad)
+            ly = cy - (tick_outer - 22) * math.cos(rad)
+            p.setPen(self._TEXT_COLOR)
+            p.drawText(QRectF(lx - 16, ly - 8, 32, 16),
+                       Qt.AlignmentFlag.AlignCenter, f"{val:.0f}")
 
             # Tacche minori
             if i < nm - 1:
                 for m in range(1, self._minor_per_major + 1):
-                    mv = val + m * (self._major_step / (self._minor_per_major + 1))
+                    mv = val + m * (self._major_step / self._minor_per_major)
                     mr = self.value_to_rotation(mv)
                     p.save()
                     p.translate(cx, cy)
                     p.rotate(mr)
-                    p.setPen(QPen(th.tick_minor_color, th.tick_minor_width))
-                    p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + minor_len))
+                    p.setPen(QPen(self._TICK_MINOR_COLOR, self._TICK_MINOR_WIDTH))
+                    p.drawLine(QPointF(0, -tick_outer), QPointF(0, -tick_outer + 8))
                     p.restore()
 
         # Titolo
-        p.setPen(th.text_secondary_color)
-        tf = p.font()
-        if th.font_family:
-            tf.setFamily(th.font_family)
-        tf.setPixelSize(th.font_size_title)
-        tf.setBold(True)
-        p.setFont(tf)
-        p.drawText(QRectF(cx - 50, cy + dial_r * 0.35, 100, 20),
-                   Qt.AlignmentFlag.AlignCenter,
-                   self._prototype.display_name.upper())
+        p.setPen(self._TEXT_SECONDARY_COLOR)
+        p.drawText(QRectF(cx - 50, cy + 20, 100, 16),
+                   Qt.AlignmentFlag.AlignCenter, self._prototype.display_name)
 
         # Etichetta unità
-        if self._unit_label:
-            p.setPen(th.text_tertiary_color)
-            uf = p.font()
-            if th.font_family:
-                uf.setFamily(th.font_family)
-            uf.setPixelSize(th.font_size_unit)
-            uf.setBold(False)
-            p.setFont(uf)
-            p.drawText(QRectF(cx - 40, cy + dial_r * 0.55, 80, 16),
-                       Qt.AlignmentFlag.AlignCenter, self._unit_label)
+        p.setPen(self._TEXT_TERTIARY_COLOR)
+        p.drawText(QRectF(cx - 40, cy + 40, 80, 14),
+                   Qt.AlignmentFlag.AlignCenter, self._unit_label)
 
     def paint_foreground(self, p):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         dial_r = min(cx, cy) - 10
-        needle_len = dial_r - 20
-        rot = self.value_to_rotation(self._value)
 
-        # Lancetta
+        rot = self.value_to_rotation(self._value)
         p.save()
         p.translate(cx, cy)
         p.rotate(rot)
-        nd = QPainterPath()
-        nd.moveTo(0, -needle_len)
-        nd.lineTo(-3, 12)
-        nd.lineTo(3, 12)
-        nd.closeSubpath()
+
+        # Lancetta
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.needle_color)
-        p.drawPath(nd)
+        p.setBrush(self._NEEDLE_COLOR)
+        needle = QPainterPath()
+        needle.moveTo(0, -dial_r + 14)
+        needle.lineTo(-4, 8)
+        needle.lineTo(4, 8)
+        needle.closeSubpath()
+        p.drawPath(needle)
         p.restore()
 
-        # Cappuccio centrale
+        # Mozzo
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.needle_hub_color)
-        p.drawEllipse(QPointF(cx, cy), 7, 7)
+        p.setBrush(self._NEEDLE_HUB_COLOR)
+        p.drawEllipse(QPointF(cx, cy), 6, 6)

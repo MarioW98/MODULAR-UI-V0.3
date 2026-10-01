@@ -139,13 +139,16 @@ class BaseInstrument(QGraphicsObject):
 
 
 class PlaceholderInstrument(BaseInstrument):
+    # Palette interna (non dipende dal tema)
+    _BORDER_COLOR = QColor(220, 220, 220)
+    _TEXT_COLOR = QColor(220, 220, 220)
+
     def paint_background(self, p):
-        th = self.theme()
         r = self.boundingRect().adjusted(2, 2, -2, -2)
-        p.setPen(QPen(th.tick_major_color, 2))
+        p.setPen(QPen(self._BORDER_COLOR, 2))
         p.setBrush(QBrush(QColor(self._prototype.color)))
         p.drawRoundedRect(r, 12, 12)
-        p.setPen(th.text_color)
+        p.setPen(self._TEXT_COLOR)
         f = p.font()
         f.setBold(True)
         p.setFont(f)

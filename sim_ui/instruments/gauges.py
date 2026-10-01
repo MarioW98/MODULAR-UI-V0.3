@@ -234,6 +234,19 @@ class OilTempGauge(CircularGauge):
 # =============================================================================
 
 class HeadingIndicator(BaseInstrument):
+    # Palette interna dello strumento (non dipende dal tema)
+    _BEZEL_COLOR = QColor(40, 40, 45)
+    _BEZEL_RING_COLOR = QColor(30, 30, 34)
+    _DIAL_COLOR = QColor(20, 22, 28)
+    _TICK_MAJOR_COLOR = QColor(220, 220, 220)
+    _TICK_MINOR_COLOR = QColor(160, 160, 160)
+    _TICK_MAJOR_WIDTH = 2.0
+    _TICK_MINOR_WIDTH = 1.0
+    _TEXT_COLOR = QColor(220, 220, 220)
+    _FONT_SIZE_NUMBERS = 11
+    _REFERENCE_COLOR = QColor(255, 160, 0)
+    _AIRCRAFT_SYMBOL_COLOR = QColor(255, 200, 0)
+
     def __init__(self, p, parent=None):
         super().__init__(p, parent)
         self._heading = 0.0
@@ -243,21 +256,19 @@ class HeadingIndicator(BaseInstrument):
         self.update()
 
     def paint_background(self, p: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         outer_r = min(cx, cy) - 4
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.bezel_color)
+        p.setBrush(self._BEZEL_COLOR)
         p.drawEllipse(QPointF(cx, cy), outer_r, outer_r)
-        p.setBrush(th.bezel_ring_color)
+        p.setBrush(self._BEZEL_RING_COLOR)
         p.drawEllipse(QPointF(cx, cy), outer_r - 3, outer_r - 3)
         dial_r = outer_r - 8
-        p.setBrush(th.dial_color)
+        p.setBrush(self._DIAL_COLOR)
         p.drawEllipse(QPointF(cx, cy), dial_r, dial_r)
 
     def paint_foreground(self, p: QPainter):
-        th = self.theme()
         w, h = self._prototype.width, self._prototype.height
         cx, cy = w / 2, h / 2
         outer_r = min(cx, cy) - 4
@@ -275,11 +286,11 @@ class HeadingIndicator(BaseInstrument):
         card_r = dial_r - 6
         for deg in range(0, 360, 5):
             if deg % 30 == 0:
-                tl, tw, tc = 16, th.tick_major_width, th.tick_major_color
+                tl, tw, tc = 16, self._TICK_MAJOR_WIDTH, self._TICK_MAJOR_COLOR
             elif deg % 10 == 0:
-                tl, tw, tc = 12, th.tick_minor_width, th.tick_major_color
+                tl, tw, tc = 12, self._TICK_MINOR_WIDTH, self._TICK_MAJOR_COLOR
             else:
-                tl, tw, tc = 8, th.tick_minor_width, th.tick_minor_color
+                tl, tw, tc = 8, self._TICK_MINOR_WIDTH, self._TICK_MINOR_COLOR
             p.save()
             p.rotate(deg)
             p.setPen(QPen(tc, tw))
@@ -302,9 +313,9 @@ class HeadingIndicator(BaseInstrument):
             p.save()
             p.rotate(deg)
             p.translate(0, -num_r)
-            p.setPen(th.text_color)
+            p.setPen(self._TEXT_COLOR)
             nf = p.font()
-            nf.setPixelSize(14 if ic else th.font_size_numbers)
+            nf.setPixelSize(14 if ic else self._FONT_SIZE_NUMBERS)
             nf.setBold(ic)
             p.setFont(nf)
             p.drawText(QRectF(-12, -8, 24, 16), Qt.AlignmentFlag.AlignCenter, lb)
@@ -322,19 +333,18 @@ class HeadingIndicator(BaseInstrument):
         lb2.lineTo(6, -dial_r + 15)
         lb2.closeSubpath()
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(th.reference_color)
+        p.setBrush(self._REFERENCE_COLOR)
         p.drawPath(lb2)
         p.restore()
 
         # Simbolo aereo
         p.save()
         p.translate(cx, cy)
-        p.setPen(QPen(th.aircraft_symbol_color, 2))
+        p.setPen(QPen(self._AIRCRAFT_SYMBOL_COLOR, 2))
         p.drawLine(QPointF(0, -12), QPointF(0, 12))
         p.drawLine(QPointF(-14, -2), QPointF(14, -2))
         p.drawLine(QPointF(-6, 9), QPointF(6, 9))
         p.restore()
-
 
 # =============================================================================
 # TURN COORDINATOR

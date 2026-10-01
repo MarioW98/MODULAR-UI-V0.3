@@ -155,35 +155,23 @@ python -m sim_ui.main
 
 ### Architettura
 
-- **`InstrumentTheme`** (dataclass): contiene tutti i parametri visivi.
+- **`InstrumentTheme`** (dataclass): contiene solo i parametri di scena e selezione.
 - **`ThemeRegistry`**: catalogo dei temi con tema di default.
-- **`BaseInstrument.set_theme()` / `theme()`**: assegna/legge il tema con invalidazione cache.
+- **`BaseInstrument.set_theme()` / `theme()`**: assegna/legge il tema (usato per il rettangolo di selezione).
 - **Menu "Tema"** nel MainWindow per cambio a runtime.
 
-### Campi del tema
+> **Nota**: i colori degli strumenti (bezel, quadrante, tacche, lancette, cielo/terra, ecc.)
+> sono definiti come **costanti interne** in ogni classe strumento. Cambiare tema
+> non modifica l'aspetto degli strumenti, ma solo lo sfondo della scena,
+> la griglia e il colore del rettangolo di selezione.
 
-
-| Gruppo      | Campi                                                                                     |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| Bezel       | `bezel_color`, `bezel_ring_color`                                                         |
-| Quadrante   | `dial_color`                                                                              |
-| Tacche      | `tick_major_color`, `tick_minor_color`, `tick_major_width`, `tick_minor_width`            |
-| Testo       | `text_color`, `text_secondary_color`, `text_tertiary_color`, `font_family`, `font_size_*` |
-| Lancette    | `needle_color`, `needle_hub_color`                                                        |
-| Attitude    | `sky_color`, `ground_color`, `horizon_color`, `pitch_ladder_color`                        |
-| Riferimenti | `reference_color`, `aircraft_symbol_color`                                                |
-| Scena       | `selection_color`, `scene_background`, `grid_color`                                       |
 
 ### Temi definiti
 
-
-| Tema      | Sfondo scena              | Descrizione                             |
-| --------- | ------------------------- | --------------------------------------- |
-| **Base**  | Canapa RGB(230, 218, 188) | Stile originale, sfondo chiaro          |
-| **Night** | Scuro RGB(15, 18, 25)     | Toni blu scuro con accenti ciano (test) |
-
-> **Nota**: gli stili *Professional*, *Comfort*, *Advance* e futuri *Minimal* non sono temi di colore ma
-> **strumenti ridisegnati** con design proprio (classi separate).
+| Tema | Sfondo scena | Griglia | Selezione | Descrizione |
+| --- | --- | --- | --- | --- |
+| **Base** | Canapa RGB(230, 218, 188) | RGB(180, 168, 145) | Blu RGB(0, 120, 215) | Stile originale, sfondo chiaro |
+| **Night** | Scuro RGB(15, 18, 25) | RGB(40, 45, 55) | Ciano RGB(0, 200, 200) | Tema notturno |
 
 ---
 
@@ -659,15 +647,19 @@ Attivabile da **Vista → OpenGL**:
 Gli stili non sono temi applicati agli stessi strumenti, ma **classi separate** con design proprio:
 
 | File | Contenuto |
-| ------- | -------- |
+| --- | --- |
 | `gauges.py` | Strumenti analogici di base |
 | `digital.py` | Strumenti digitali di base |
 | `attitude.py` | Orizzonti artificiali semplici |
 | `professional.py` | Strumenti stile Professional |
 | `advance_instr.py` | Strumenti avanzati |
 | `comfort_instr.py` | Strumenti Comfort |
+| `view_instr.py` | Strumenti a nastro (tape) |
+| `viewport.py` | Finestra visuale simulatore |
 
-Ogni stile ha il proprio `type_id` nel registry
+Ogni stile ha il proprio `type_id` nel registry e gestisce i propri colori
+internamente tramite costanti di classe. Il tema della scena non influenza
+i colori degli strumenti.
 
 ### Factory e Registry
 
@@ -689,12 +681,23 @@ Il sistema `save_state()` / `restore_state()` in `BaseInstrument` raccoglie lo s
 ## Principali modifiche rispetto alla versione precedente
 
 | Sezione | Cambiamento |
-|---|---|
+| --- | --- |
+| Temi | Il tema gestisce solo scena e selezione. I colori degli strumenti sono interni a ogni classe. |
 | Struttura | Split `specific.py` → `gauges.py` / `digital.py` / `attitude.py`; rinomina `advance_instr.py`; aggiunto `comfort_instr.py` |
-| Temi | Aggiunto effetto su sfondo scena e griglia; tema Base = canapa |
 | Catalogo | Aggiunti Turn Coordinator, AttitudeAdvance, 5 strumenti Comfort; rimosso stile Clean |
 | Mixin | Nuova sezione dedicata (`UnitButtonsMixin`, `TurnTargetMixin`, `ColorSelectorMixin`) |
 | Unità | Contratto SI; aggiunto FT/SEC; default SI; helper `unit_index` |
 | Persistenza | Ora salva unità, target, palette, tema; nuovo campo `state` e `theme_id` |
-| Telemetria | Aggiunto campo `turn_rate` |
+| Telemetria | Aggiunto campo `turn_rate`. `ExternalTelemetryAdapter.push_data()` è ora thread-safe. |
+| Correzioni | Rimuovo try/except globale in PFD; serializzazione unità PFD; fix modulo in `_cycle_palette`; licenza MIT |
 | Prossimi passi | Rimosso Clean in favore di Minimal; aggiornate priorità |
+
+---
+
+## Collaborazione e contratto dati
+
+- Il backend fornisce dati in SI tramite `push_data()`
+- `TelemetryData` è il contratto tra simulatore e interfaccia
+- Regola: aggiunte di campi solo additive (mai rinomine senza accordo)
+- La grafica modifica solo `paint_background`/`paint_foreground`
+- `ExternalTelemetryAdapter.push_data()` è thread-safe: può essere chiamato da qualsiasi thread; l'emissione del segnale viene schedulata nel main thread Qt
