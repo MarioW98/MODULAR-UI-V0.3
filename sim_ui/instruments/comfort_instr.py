@@ -30,6 +30,7 @@ def _make_palette(rgb):
 
 COMFORT_ORANGE = _make_palette((255, 126, 0))   # Arancione BMW
 COMFORT_GREEN  = _make_palette((0, 175, 0))     # Verde HUD militare
+COMFORT_BLUE = _make_palette((0, 120, 255))
 
 
 # =============================================================================
@@ -41,14 +42,15 @@ class AirspeedComfort(ColorSelectorMixin, UnitButtonsMixin, BaseInstrument):
     Anemometro analogico stile Comfort:
     - Quadrante circolare con lancetta, palette monocromatica
     - Cambio unità: pulsanti in alto a destra (UnitButtonsMixin)
-    - Cambio colore: selettore in basso a destra (orange ↔ green)
+    - Cambio colore: selettore in basso a destra (orange ↔ green ↔ blue)
     """
 
     _PALETTES = {
         "orange": COMFORT_ORANGE,
         "green":  COMFORT_GREEN,
+        "blue":   COMFORT_BLUE,
     }
-    _PALETTE_ORDER = ["orange", "green"]
+    _PALETTE_ORDER = ["orange", "green", "blue"]
 
     def __init__(self, prototype, parent=None):
         super().__init__(prototype, parent)
@@ -225,14 +227,15 @@ class AltimeterComfort(ColorSelectorMixin, UnitButtonsMixin, BaseInstrument):
     - Lancetta lunga: centinaia (1 giro = 1000 unità)
     - Lancetta corta: migliaia (1 giro = 10000 unità)
     - Cambio unità: FEET / METERS (default METERS)
-    - Cambio colore: selettore in basso a destra (orange ↔ green)
+    - Cambio colore: selettore in basso a destra (orange ↔ green ↔ blue)
     """
 
     _PALETTES = {
         "orange": COMFORT_ORANGE,
         "green":  COMFORT_GREEN,
+        "blue":   COMFORT_BLUE,
     }
-    _PALETTE_ORDER = ["orange", "green"]
+    _PALETTE_ORDER = ["orange", "green", "blue"]
 
     def __init__(self, prototype, parent=None):
         super().__init__(prototype, parent)
@@ -429,14 +432,15 @@ class VSIComfort(ColorSelectorMixin, UnitButtonsMixin, BaseInstrument):
     - Scala UP/DOWN con 0 a ore 9
     - Escursione ±170°
     - Cambio unità: FT/MIN / M/S / FT/SEC (default M/S)
-    - Cambio colore: selettore in basso a destra (orange ↔ green)
+    - Cambio colore: selettore in basso a destra (orange ↔ green ↔ blue)
     """
 
     _PALETTES = {
         "orange": COMFORT_ORANGE,
         "green":  COMFORT_GREEN,
+        "blue":   COMFORT_BLUE,
     }
-    _PALETTE_ORDER = ["orange", "green"]
+    _PALETTE_ORDER = ["orange", "green", "blue"]
     _SWEEP_DEG = 170.0
 
     def __init__(self, prototype, parent=None):
@@ -668,14 +672,15 @@ class HeadingComfort(ColorSelectorMixin,BaseInstrument):
     - Cardinali N/E/S/W evidenziati
     - Lubber line fissa in alto
     - Simbolo aereo fisso al centro
-    - Cambio colore: selettore in basso a destra (orange ↔ green)
+    - Cambio colore: selettore in basso a destra (orange ↔ green ↔ blue)
     """
 
     _PALETTES = {
         "orange": COMFORT_ORANGE,
         "green":  COMFORT_GREEN,
+        "blue":   COMFORT_BLUE
     }
-    _PALETTE_ORDER = ["orange", "green"]
+    _PALETTE_ORDER = ["orange", "green", "blue"]
 
     def __init__(self, prototype, parent=None):
         super().__init__(prototype, parent)
@@ -840,14 +845,15 @@ class TurnCoordinatorComfort(ColorSelectorMixin,TurnTargetMixin, BaseInstrument)
     - Lancetta di lettura
     - Inclinometro con pallina
     - Target turn rate regolabile (TurnTargetMixin)
-    - Cambio colore: selettore in basso a destra (orange ↔ green)
+    - Cambio colore: selettore in basso a destra (orange ↔ green ↔ blue)
     """
 
     _PALETTES = {
         "orange": COMFORT_ORANGE,
         "green":  COMFORT_GREEN,
+        "blue":   COMFORT_BLUE
     }
-    _PALETTE_ORDER = ["orange", "green"]
+    _PALETTE_ORDER = ["orange", "green", "blue"]
 
     def __init__(self, prototype, parent=None):
         super().__init__(prototype, parent)
