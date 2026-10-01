@@ -106,13 +106,7 @@ class MainWindow(QMainWindow):
         self._update_status_bar()
 
     def _toggle_opengl(self):
-        """Attiva/disattiva viewport OpenGL (commutazione ON/OFF reale).
-
-        Regola d'oro: lo STATO REALE è il tipo del viewport della view
-        (is_opengl()), non un flag salvato. Il menu viene sempre risincronizzato
-        su di esso, quindi non esistono più stati "incastrati" in OpenGL.
-        """
-        # Stato attuale dedotto dalla view (unica fonte di verità)
+        """Attiva/disattiva viewport OpenGL (stato reale = tipo del viewport)."""
         current = self._view.is_opengl()
         new_state = not current
 
@@ -122,14 +116,14 @@ class MainWindow(QMainWindow):
                 "PySide6.QtOpenGLWidgets non è installato.\n"
                 "Installa con: pip install PySide6"
             )
-            self._act_opengl.blockSignals(True)
-            self._act_opengl.setChecked(current)
-            self._act_opengl.blockSignals(False)
+            if hasattr(self, '_act_opengl'):
+                self._act_opengl.blockSignals(True)
+                self._act_opengl.setChecked(current)
+                self._act_opengl.blockSignals(False)
             return
 
         self._view.set_opengl(new_state)
-        # riverifica dopo il cambio: se set_opengl() non ha applicato, lo stato reale rimane invariato
-        self._opengl_enabled = self._view.is_opengl()
+        self._opengl_enabled = self._view.is_opengl()   # riverifica dopo il cambio
 
         # Invalida la cache di rendering di ogni strumento
         for item in self._all_instruments():
@@ -137,7 +131,6 @@ class MainWindow(QMainWindow):
                 item._bg_cache = None
             item.update()
 
-        # Forza redraw completo
         self._scene.invalidate()
         self._view.viewport().update()
 
@@ -146,15 +139,8 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, '_act_opengl'):
             self._act_opengl.blockSignals(True)
-            self._act_opengl.setChecked(True)
-            self._view.setEnabled(False)
-            self._act_opengl.blockSignals(False)
-
-        if hasattr(self, '_act_opengl'):
-            self._act_opengl.blockSignals(True)
             self._act_opengl.setChecked(self._opengl_enabled)
             self._act_opengl.blockSignals(False)
-
 
 
     def _set_target_fps(self, fps: int):

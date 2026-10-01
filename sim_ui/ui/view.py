@@ -173,6 +173,16 @@ class InstrumentGraphicsView(QGraphicsView):
         vp.setAttribute(Qt.WA_AcceptDrops, True)
         vp.setAcceptDrops(True)
 
+
+    def _install_viewport_filter(self):
+        """Reinstalla event filter + mouse tracking sul viewport corrente.
+        Necessario dopo ogni setViewport() (toggle OpenGL), altrimenti
+        context menu, click destro e tracking delle coordinate muoiono.
+        """
+        vp = self.viewport()
+        vp.installEventFilter(self)
+        vp.setMouseTracking(True)
+        
     # =========================================================================
     # EVENT FILTER
     # =========================================================================
