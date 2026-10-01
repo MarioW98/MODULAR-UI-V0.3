@@ -94,15 +94,35 @@ class MockTelemetryAdapter(TelemetryAdapter):
 
 
 class ExternalTelemetryAdapter(TelemetryAdapter):
+    """
+    Adapter per ricevere dati telemetrici da un backend esterno.
+    Thread-safe: push_data() può essere chiamato da qualsiasi thread.
+    L'emissione del segnale viene schedulata nel main thread Qt.
+    """
 
     def start(self): pass
     def stop(self): pass
 
     def push_data(self, data: dict | TelemetryData):
+        """
+        Riceve dati telemetrici dal backend.
+        
+        Questo metodo è thread-safe: può essere chiamato da qualsiasi thread.
+        L'emissione del segnale telemetry_updated viene schedulata nel main
+        thread Qt usando QTimer.singleShot(0, ...).
+        
+        Args:
+            data: dict con chiavi corrispondenti a TelemetryData, oppure
+                  istanza di TelemetryData.
+        """
         if isinstance(data, dict):
             telemetry = TelemetryData(
                 **{k: data.get(k, 0.0) for k in TelemetryData.__dataclass_fields__}
             )
         else:
             telemetry = data
-        self.telemetry_updated.emit(telemetry)
+        
+        # Schedula l'emissione nel main thread Qt
+        # QTimer.singleShot(0, ...) esegue il callback nel prossimo ciclo
+        # dell'event loop, garantendo thread-safety
+        QTimer.singleShot(0, lambda: self.telemetry_updated.emit(telemetry))
