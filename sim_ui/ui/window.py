@@ -595,6 +595,7 @@ class MainWindow(QMainWindow):
         self._update_status_bar(); self._update_toolbar_state()
 
     def _all_instruments(self):
+        
         if self._instrument_cache_dirty:
             self._instrument_cache = [
                 i for i in self._scene.items()
@@ -769,13 +770,7 @@ class MainWindow(QMainWindow):
         self._invalidate_instrument_cache()
         self._update_status_bar()
 
-    # def delete_selected(self):
-    #     for it in self._selected_instruments():
-    #         it.setSelected(False)
-    #         self._scene.removeItem(it)
-    #         it.deleteLater()
-    #     self._invalidate_instrument_cache()      # ← DEVE esserci
-    #     self._update_status_bar()
+
 
     # =========================================================================
     # PERSISTENZA

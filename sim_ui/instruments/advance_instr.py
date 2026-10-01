@@ -670,7 +670,34 @@ class PrimaryFlightDisplay(BaseInstrument):
         """Passa all'unità successiva per l'altitudine."""
         self._altitude_unit_idx = (self._altitude_unit_idx + 1) % len(self._altitude_units)
         self.update()
+    def unit_state(self) -> dict:
+        """Restituisce lo stato serializzabile delle unità correnti (airspeed + altitude)."""
+        airspeed_unit = self._current_unit()
+        altitude_unit = self._current_altitude_unit()
+        return {
+            "airspeed_unit": airspeed_unit.unit_id if airspeed_unit else "ms",
+            "altitude_unit": altitude_unit.unit_id if altitude_unit else "m",
+        }
 
+    def restore_unit_state(self, state: dict):
+        """Ripristina le unità da uno stato salvato."""
+        # Ripristina airspeed
+        airspeed_id = state.get("airspeed_unit")
+        if airspeed_id:
+            for idx, u in enumerate(self._units):
+                if u.unit_id == airspeed_id:
+                    self._unit_idx = idx
+                    break
+        
+        # Ripristina altitude
+        altitude_id = state.get("altitude_unit")
+        if altitude_id:
+            for idx, u in enumerate(self._altitude_units):
+                if u.unit_id == altitude_id:
+                    self._altitude_unit_idx = idx
+                    break
+        
+        self.update()
     def mousePressEvent(self, event):
         """Gestisce il click sui pulsanti unità."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -702,145 +729,139 @@ class PrimaryFlightDisplay(BaseInstrument):
             QPainter.RenderHint.TextAntialiasing |
             QPainter.RenderHint.SmoothPixmapTransform
         )
-        try:
-            w, h = self._prototype.width, self._prototype.height
-            cx = w / 2
-            cy = h / 2
+        w, h = self._prototype.width, self._prototype.height
+        cx = w / 2
+        cy = h / 2
 
-            # --- 1. ATTITUDE INDICATOR (con clipping) ---
-            painter.save()
-            clip_path = QPainterPath()
-            clip_path.addRect(0, 0, w, h)
-            painter.setClipPath(clip_path)
+        # --- 1. ATTITUDE INDICATOR (con clipping) ---
+        painter.save()
+        clip_path = QPainterPath()
+        clip_path.addRect(0, 0, w, h)
+        painter.setClipPath(clip_path)
 
-            # Rotazione e pitch
-            painter.save()
-            painter.translate(cx, cy)
-            painter.rotate(-self._roll)
-            pitch_offset = self._pitch * self._px_per_deg
+        # Rotazione e pitch
+        painter.save()
+        painter.translate(cx, cy)
+        painter.rotate(-self._roll)
+        pitch_offset = self._pitch * self._px_per_deg
 
-            # Cielo e terra
-            large = max(w, h) * 3
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(self._SKY_COLOR)
-            painter.drawRect(QRectF(-large, -large + pitch_offset, large * 2, large))
-            painter.setBrush(self._GROUND_COLOR)
-            painter.drawRect(QRectF(-large, pitch_offset, large * 2, large))
+        # Cielo e terra
+        large = max(w, h) * 3
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._SKY_COLOR)
+        painter.drawRect(QRectF(-large, -large + pitch_offset, large * 2, large))
+        painter.setBrush(self._GROUND_COLOR)
+        painter.drawRect(QRectF(-large, pitch_offset, large * 2, large))
 
-            # Linea orizzonte
-            painter.setPen(QPen(self._HORIZON_COLOR, 2))
-            painter.drawLine(QPointF(-large, pitch_offset), QPointF(large, pitch_offset))
+        # Linea orizzonte
+        painter.setPen(QPen(self._HORIZON_COLOR, 2))
+        painter.drawLine(QPointF(-large, pitch_offset), QPointF(large, pitch_offset))
 
-            # Pitch ladder
-            painter.setPen(QPen(self._PITCH_LADDER_COLOR, 1))
-            font = painter.font()
-            font.setPixelSize(14)
-            font.setBold(True)
-            font.setFamily("Consolas")
-            painter.setFont(font)
+        # Pitch ladder
+        painter.setPen(QPen(self._PITCH_LADDER_COLOR, 1))
+        font = painter.font()
+        font.setPixelSize(14)
+        font.setBold(True)
+        font.setFamily("Consolas")
+        painter.setFont(font)
 
-            for deg in range(-90, 95, 5):
-                if deg == 0:
-                    continue
-                y_pos = pitch_offset - deg * self._px_per_deg
-                if y_pos < -large or y_pos > large:
-                    continue
+        for deg in range(-90, 95, 5):
+            if deg == 0:
+                continue
+            y_pos = pitch_offset - deg * self._px_per_deg
+            if y_pos < -large or y_pos > large:
+                continue
 
-                if deg % 10 == 0:
-                    half_w = 50
-                    draw_number = True
+            if deg % 10 == 0:
+                half_w = 50
+                draw_number = True
+            else:
+                half_w = 25
+                draw_number = False
+
+            painter.drawLine(QPointF(-half_w, y_pos), QPointF(half_w, y_pos))
+
+            if draw_number:
+                label = str(abs(deg))
+                painter.setPen(self._PITCH_LADDER_COLOR)
+                painter.drawText(QRectF(-half_w - 30, y_pos - 8, 28, 16),
+                            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
+                painter.drawText(QRectF(half_w + 2, y_pos - 8, 28, 16),
+                            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
+                painter.setPen(QPen(self._PITCH_LADDER_COLOR, 1))
+
+        painter.restore()  # Fine rotazione
+
+        # Zero pitch reference line
+        painter.setPen(QPen(self._HORIZON_COLOR, 1.5, Qt.PenStyle.DashLine))
+        painter.drawLine(QPointF(cx - 80, cy), QPointF(cx + 80, cy))
+
+        painter.restore()  # Fine clipping
+
+        # --- 2. AIRSPEED TAPE ---
+        self._draw_airspeed_tape(painter, cx, cy, h)
+
+        # --- 3. ALTITUDE TAPE ---
+        self._draw_altitude_tape(painter, cx, cy, h)
+
+        # --- HEADING ARC (basso) ---
+        self._draw_heading_arc(painter, cx, cy, h)
+
+        # --- 4. AIRCRAFT SYMBOL ---
+        painter.save()
+        painter.translate(cx, cy)
+        painter.setPen(QPen(self._AIRCRAFT_SYMBOL_COLOR, 3))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawLine(QPointF(-60, 0), QPointF(-20, 0))
+        painter.drawLine(QPointF(20, 0), QPointF(60, 0))
+        painter.setBrush(self._AIRCRAFT_SYMBOL_COLOR)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(QPointF(0, 0), 4, 4)
+        painter.restore()
+
+        # --- 5. BORESIGHT ---
+        painter.save()
+        painter.translate(cx, cy)
+        boresight_y = -h / 2 + 40
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._BORESIGHT_COLOR)
+        triangle = QPainterPath()
+        triangle.moveTo(0, boresight_y)
+        triangle.lineTo(-8, boresight_y - 12)
+        triangle.lineTo(8, boresight_y - 12)
+        triangle.closeSubpath()
+        painter.drawPath(triangle)
+        painter.restore()
+
+        # --- 6. ROLL INDICATOR ---
+        painter.save()
+        painter.translate(cx, cy)
+        arc_radius = h / 2 - 30
+        painter.setPen(QPen(self._HORIZON_COLOR, 1.5))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        arc_rect = QRectF(-arc_radius, -arc_radius, arc_radius * 2, arc_radius * 2)
+        painter.drawArc(arc_rect, 30 * 16, 120 * 16)
+        
+        roll_marks = [0, 10, 20, 30, 45, 60]
+        for angle in roll_marks:
+            signs = [1] if angle == 0 else [1, -1]
+            for sign in signs:
+                deg = angle * sign
+                painter.save()
+                painter.rotate(deg)
+                if angle == 0:
+                    tick_len = 12
+                    tick_w = 2
+                elif angle in (10, 20, 30):
+                    tick_len = 8
+                    tick_w = 1.5
                 else:
-                    half_w = 25
-                    draw_number = False
-
-                painter.drawLine(QPointF(-half_w, y_pos), QPointF(half_w, y_pos))
-
-                if draw_number:
-                    label = str(abs(deg))
-                    painter.setPen(self._PITCH_LADDER_COLOR)
-                    painter.drawText(QRectF(-half_w - 30, y_pos - 8, 28, 16),
-                                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
-                    painter.drawText(QRectF(half_w + 2, y_pos - 8, 28, 16),
-                                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
-                    painter.setPen(QPen(self._PITCH_LADDER_COLOR, 1))
-
-            painter.restore()  # Fine rotazione
-
-            # Zero pitch reference line
-            painter.setPen(QPen(self._HORIZON_COLOR, 1.5, Qt.PenStyle.DashLine))
-            painter.drawLine(QPointF(cx - 80, cy), QPointF(cx + 80, cy))
-
-            painter.restore()  # Fine clipping
-
-            # --- 2. AIRSPEED TAPE ---
-            self._draw_airspeed_tape(painter, cx, cy, h)
-
-            # --- 3. ALTITUDE TAPE ---
-            self._draw_altitude_tape(painter, cx, cy, h)
-
-            # --- HEADING ARC (basso) ---
-            self._draw_heading_arc(painter, cx, cy, h)
-
-            # --- 4. AIRCRAFT SYMBOL ---
-            painter.save()
-            painter.translate(cx, cy)
-            painter.setPen(QPen(self._AIRCRAFT_SYMBOL_COLOR, 3))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawLine(QPointF(-60, 0), QPointF(-20, 0))
-            painter.drawLine(QPointF(20, 0), QPointF(60, 0))
-            painter.setBrush(self._AIRCRAFT_SYMBOL_COLOR)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(QPointF(0, 0), 4, 4)
-            painter.restore()
-
-            # --- 5. BORESIGHT ---
-            painter.save()
-            painter.translate(cx, cy)
-            boresight_y = -h / 2 + 40
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(self._BORESIGHT_COLOR)
-            triangle = QPainterPath()
-            triangle.moveTo(0, boresight_y)
-            triangle.lineTo(-8, boresight_y - 12)
-            triangle.lineTo(8, boresight_y - 12)
-            triangle.closeSubpath()
-            painter.drawPath(triangle)
-            painter.restore()
-
-            # --- 6. ROLL INDICATOR ---
-            painter.save()
-            painter.translate(cx, cy)
-            arc_radius = h / 2 - 30
-            painter.setPen(QPen(self._HORIZON_COLOR, 1.5))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            arc_rect = QRectF(-arc_radius, -arc_radius, arc_radius * 2, arc_radius * 2)
-            painter.drawArc(arc_rect, 30 * 16, 120 * 16)
-            
-            roll_marks = [0, 10, 20, 30, 45, 60]
-            for angle in roll_marks:
-                signs = [1] if angle == 0 else [1, -1]
-                for sign in signs:
-                    deg = angle * sign
-                    painter.save()
-                    painter.rotate(deg)
-                    if angle == 0:
-                        tick_len = 12
-                        tick_w = 2
-                    elif angle in (10, 20, 30):
-                        tick_len = 8
-                        tick_w = 1.5
-                    else:
-                        tick_len = 10
-                        tick_w = 1.5
-                    painter.setPen(QPen(self._HORIZON_COLOR, tick_w))
-                    painter.drawLine(QPointF(0, -arc_radius), QPointF(0, -arc_radius + tick_len))
-                    painter.restore()
-            painter.restore()
-
-        except Exception as e:
-            # Gestione errori per evitare crash
-            print(f"Errore in paint_foreground: {e}")
-    
+                    tick_len = 10
+                    tick_w = 1.5
+                painter.setPen(QPen(self._HORIZON_COLOR, tick_w))
+                painter.drawLine(QPointF(0, -arc_radius), QPointF(0, -arc_radius + tick_len))
+                painter.restore()
+        painter.restore()
     
     # =========================================================================
     # AIRSPEED TAPE CON PULSANTE UNITÀ
