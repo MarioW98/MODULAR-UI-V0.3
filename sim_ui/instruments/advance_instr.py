@@ -670,6 +670,7 @@ class PrimaryFlightDisplay(BaseInstrument):
         """Passa all'unità successiva per l'altitudine."""
         self._altitude_unit_idx = (self._altitude_unit_idx + 1) % len(self._altitude_units)
         self.update()
+        
     def unit_state(self) -> dict:
         """Restituisce lo stato serializzabile delle unità correnti (airspeed + altitude)."""
         airspeed_unit = self._current_unit()
