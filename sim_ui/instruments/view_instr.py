@@ -19,12 +19,6 @@ class AirspeedTape(UnitButtonsMixin, BaseInstrument):
     _VNO = 120
     _VNE = 160
 
-    _TAPE_STEPS = {
-        "KNOTS": (5.0, 10.0),
-        "KM/H":  (10.0, 20.0),
-        "MPH":   (5.0, 10.0),
-        "M/S":   (2.5, 5.0),
-    }
 
     _TAPE_STEPS = {
         "kt":  (5.0, 10.0),
