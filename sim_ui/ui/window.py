@@ -639,6 +639,12 @@ class MainWindow(QMainWindow):
         item.set_grid_size(self._grid_size)
         item.setPos(self._clamp(desired, item.prototype, item.scale()))
         self._scene.addItem(item)
+        
+        # Porta davanti l'ultimo strumento aggiunto
+        max_z = max((i.zValue() for i in self._scene.items() 
+                    if isinstance(i, BaseInstrument)), default=0)
+        item.setZValue(max_z + 1)
+        
         self._invalidate_instrument_cache() 
         if self._preview_mode:
             item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
@@ -801,21 +807,23 @@ class MainWindow(QMainWindow):
             "instruments": instruments,
         }
     
+
     def _deserialize(self, data):
         try:
             version = int(data.get("schema_version", 0))
         except (ValueError, TypeError):
             return False
-        if version > LAYOUT_SCHEMA_VERSION: return False  # Versione futura non supportata
+        if version > LAYOUT_SCHEMA_VERSION: return False
         self._clear_all(); self._snap_enabled = False
 
-        # Ripristina il tema salvato
         theme_id = data.get("theme_id")
         if theme_id:
             theme = self._theme_registry.get(theme_id)
             if theme:
                 self._current_theme = theme
 
+        # Fase 1: crea e aggiungi tutti gli strumenti SENZA zValue
+        items_list = []
         for inst in data.get("instruments", []):
             proto = self._registry.get(inst.get("type_id"))
             if not proto: continue
@@ -825,7 +833,6 @@ class MainWindow(QMainWindow):
             item.setPos(inst.get("x",0), inst.get("y",0))
             item.setRotation(inst.get("rotation",0))
             item.setScale(inst.get("scale",1.0))
-            item.setZValue(inst.get("z",0))
             item.set_grid_size(self._grid_size)
             state = inst.get("state")
             if state and hasattr(item, "restore_state"):
@@ -833,6 +840,13 @@ class MainWindow(QMainWindow):
             self._scene.addItem(item)
             if self._current_theme:
                 item.set_theme(self._current_theme)
+            # Salva item e zValue per la fase 2
+            items_list.append((item, inst.get("z", 0)))
+
+        # Fase 2: imposta TUTTI i zValue DOPO aver aggiunto tutti gli item
+        # Questo garantisce che Qt non modifichi i valori durante addItem
+        for item, z_val in items_list:
+            item.setZValue(z_val)
 
         self._invalidate_instrument_cache() 
         self._snap_enabled = data.get("snap_enabled", False)
@@ -840,13 +854,11 @@ class MainWindow(QMainWindow):
         self._scene.set_grid_size(self._grid_size)
         self.set_snap(self._snap_enabled)
 
-        # Applica il tema a scena, griglia e checkmark menu
         if theme_id:
             self._apply_theme(theme_id)
 
         self._update_status_bar()
         return True
-
     
     def _save_layout(self):
         fp, _ = QFileDialog.getSaveFileName(self, "Salva layout", "", "JSON (*.json)")

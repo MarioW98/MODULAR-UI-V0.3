@@ -173,6 +173,27 @@ class InstrumentGraphicsView(QGraphicsView):
         vp.setAttribute(Qt.WA_AcceptDrops, True)
         vp.setAcceptDrops(True)
 
+    def dropEvent(self, event):
+        """Gestisce il drop degli strumenti dalla lista hangar."""
+        mime = event.mimeData()
+        if mime.hasFormat(MIME_INSTRUMENT):
+            type_id = bytes(mime.data(MIME_INSTRUMENT)).decode("utf-8")
+            scene_pos = self.mapToScene(event.position().toPoint())
+            self.instrument_dropped.emit(type_id, scene_pos)
+            
+            # Porta davanti l'ultimo strumento aggiunto
+            items = self.scene().items(scene_pos)
+            for item in items:
+                if isinstance(item, BaseInstrument):
+                    # Trova il zValue massimo attuale
+                    max_z = max((i.zValue() for i in self.scene().items() 
+                                if isinstance(i, BaseInstrument)), default=0)
+                    item.setZValue(max_z + 1)
+                    break
+            
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
 
     def _install_viewport_filter(self):
         """Reinstalla event filter + mouse tracking sul viewport corrente.
