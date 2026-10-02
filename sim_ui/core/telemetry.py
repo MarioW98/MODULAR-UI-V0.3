@@ -45,7 +45,7 @@ class MockTelemetryAdapter(TelemetryAdapter):
         self._interval_ms = 50
         self._prev_heading = 0.0
 
-    def start(self, interval_ms: int = None):
+    def start(self, interval_ms: int | None = None):
         if interval_ms is not None:
             self._interval_ms = interval_ms
         self._timer.start(self._interval_ms)

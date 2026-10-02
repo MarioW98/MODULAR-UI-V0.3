@@ -55,6 +55,8 @@ def build_default_registry() -> InstrumentRegistry:
                                    200, 200, "#1B5E20", "Anemometro Pro", style="Professional"))
     r.register(InstrumentPrototype("flight-altimeter", "Altimeter", "Volo",
                                    200, 200, "#1E88E5", "Altimetro", style="Base"))
+    r.register(InstrumentPrototype("flight-altimeter-pro", "Altimeter Pro", "Volo",
+                                   200, 200, "#0D47A1", "Altimetro (Professional)", style="Professional"))
     r.register(InstrumentPrototype("flight-attitude", "Attitude", "Volo",
                                    220, 220, "#5E35B1", "Orizzonte Artificiale",style="Base"))
     r.register(InstrumentPrototype("flight-attitude-full", "Attitude Full", "Volo",
@@ -84,8 +86,7 @@ def build_default_registry() -> InstrumentRegistry:
                                    200, 200, "#00897B", "Indicatore di prua", style="Base"))
     r.register(InstrumentPrototype("nav-heading-pro", "Heading Pro", "Navigazione",
                                    200, 200, "#004D40", "Indicatore di prua (Professional)", style="Professional"))
-    r.register(InstrumentPrototype("flight-altimeter-pro", "Altimeter Pro", "Volo",
-                                   200, 200, "#0D47A1", "Altimetro (Professional)", style="Professional"))
+
 
     # --- Avanzati (serie speciale) ---
     r.register(InstrumentPrototype("adv-sq-attitude", "Attitude AdvanceSq", "Avanzati",

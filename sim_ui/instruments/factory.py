@@ -1,13 +1,7 @@
 from __future__ import annotations
 from ..core.prototype import InstrumentPrototype
 from .base import BaseInstrument, PlaceholderInstrument
-from .professional import (
-            AirspeedIndicatorProfessional,
-            HeadingIndicatorProfessional,
-            AltimeterProfessional,
-        )
-from .advance_instr import AttitudeAdvance
-from .comfort_instr import AirspeedComfort, AltimeterComfort, VSIComfort, HeadingComfort, TurnCoordinatorComfort
+
 
 class InstrumentFactory:
     _map: dict[str, type] = {}
@@ -25,6 +19,7 @@ class InstrumentFactory:
         from .professional import (
             AirspeedIndicatorProfessional,
             HeadingIndicatorProfessional,
+            AltimeterProfessional,
             VSIGaugeProfessional,
             TurnCoordinatorProfessional,
         )
