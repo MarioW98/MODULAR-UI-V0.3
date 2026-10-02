@@ -148,6 +148,11 @@ python -m sim_ui.main
 | Ottimizzazioni | Culling telemetrico + cache strumenti                           | ✅    |
 | Contratto SI | Telemetria in Sistema Internazionale                              | ✅    |
 | Scena       | Righelli viewport + linee centrali                                 | ✅    |
+| Correzioni | Try/except PFD, serializzazione unità PFD, fix `_cycle_palette`, thread-safety `push_data()`, licenza MIT | ✅ |
+| Temi | Tema gestisce solo scena e selezione; colori strumenti interni alle classi | ✅ |
+| Hangar | Fix QPainter al click in modalità lista; icone rimosse in lista, ripristinate in miniature | ✅ |
+| Pulizia | `main.py` ripulito, costanti duplicate rimosse, import ridondanti in `factory.py` rimossi, lookup unità su `unit_id` | ✅ |
+
 
 ---
 
@@ -437,9 +442,10 @@ Il dock Hangar contiene:
 ### Interazione
 
 - **Doppio-click**: aggiunge lo strumento al centro della vista.
-- **Drag & drop**: trascina lo strumento nella posizione desiderata.
-- **Toggle miniature/lista**: pulsante per passare da icone 52×52 a lista compatta
+- **Drag & drop**: trascina lo strumento nella posizione desiderata. L'immagine del drag viene recuperata dalla cache delle thumbnail del dock (funziona anche in modalità lista dove le icone sono nascoste).
+- **Toggle miniature/lista**: pulsante per passare da icone 52×52 a lista compatta. In modalità lista le icone vengono rimosse dagli item per evitare artefatti visivi; vengono ripristinate dalla cache al ritorno in modalità miniature.
 
+> **Nota**: in modalità lista `setIconSize` usa `QSize(1, 1)` (non `QSize(0, 0)`) per evitare la creazione di QPixmap nulle durante il repaint degli item al click (compariva "errore" a terminale).
 ---
 
 ## Controlli e scorciatoie
@@ -552,6 +558,8 @@ Implementazione:
 | `z`           | Z-order (profondità)                        |
 | `state`       | Stato specifico (opzionale, vedi sotto)     |
 
+> **Nota sullo z-order**: il campo `z` salva la profondità dello strumento. Durante il caricamento, tutti gli strumenti vengono prima aggiunti alla scena e solo successivamente viene impostato il `zValue`, per garantire che Qt non modifichi l'ordine durante l'inserimento.
+
 ### Campi globali salvati
 
 | Campo          | Descrizione                   |
@@ -611,6 +619,7 @@ Libreria di layout salvabili (File → Preset):
 | FPS Counter           | Misura la frequenza di aggiornamento reale          |
 | FPS Target            | Regola la frequenza del mock adapter                |
 | Stress test           | Genera 10/50/100 strumenti per test di carico      |
+| Cache thumbnail | Le thumbnail dell'hangar sono renderizzate una volta e cachate; il drag in modalità lista usa la cache |
 
 ### Viewport OpenGL
 
@@ -625,11 +634,27 @@ Attivabile da **Vista → OpenGL**:
 ## Prossimi passi
 
 ### In programma
+
+- **Snapping avanzato**: allineamento magnetico ai bordi/centri degli altri strumenti, guide visive durante il drag, distribuzione uniforme. Maggiori dettagli nella roadmap.
+- **Fix z-order completo**: preservare l'ordine davanti/dietro degli strumenti durante il caricamento senza richiedere "Porta davanti" manuale.
 - Finestra grafica del simulatore (futura camera drone)
 - Step 9: interazione strumenti (knob, popup, toggle)
 
+### In valutazione (roadmap)
+
+- Lock degli strumenti (blocco posizione/dimensioni)
+- Undo/Redo per le operazioni di editing
+- Keyboard shortcuts globali (frecce per micro-spostamenti, Ctrl+Z/Y)
+- Multi-monitor support
+- Export/Import configurazioni complete
+- Fullscreen mode (F11 con UI nascosta)
+- Layer management (raggruppamento strumenti per funzione)
+- Copy/Paste di strumenti con stato
+
 ### Rimandato
+
 - Completare Professional mancanti (RPM Pro, Oil Temp Pro, Attitude Pro)
+- Stile Minimal (pianificato)
 - LOD per ottimizzazione estrema
 
 
@@ -667,11 +692,12 @@ i colori degli strumenti.
 - **Factory** (`instruments/factory.py`): crea l'istanza grafica dal `type_id`.
 - Per aggiungere un nuovo strumento: registrare nel registry + mappare nella factory.
 
-### Persistenza estensibile
+### Salvataggio estensibile
 
 Il sistema `save_state()` / `restore_state()` in `BaseInstrument` raccoglie lo stato da tutti i mixin presenti. Per aggiungere un nuovo stato persistito:
 1. Aggiungere `xxx_state()` / `restore_xxx_state()` al mixin interessato.
 2. Aggiungere 2 righe in `save_state()` / `restore_state()`.
+3. Per il PFD (`PrimaryFlightDisplay`), che gestisce le unità manualmente senza `UnitButtonsMixin`, i metodi `unit_state()` e `restore_unit_state()` sono implementati direttamente nella classe e salvano le chiavi `airspeed_unit` e `altitude_unit`.
 
 `window.py` non richiede modifiche.
 
@@ -682,15 +708,16 @@ Il sistema `save_state()` / `restore_state()` in `BaseInstrument` raccoglie lo s
 
 | Sezione | Cambiamento |
 | --- | --- |
-| Temi | Il tema gestisce solo scena e selezione. I colori degli strumenti sono interni a ogni classe. |
-| Struttura | Split `specific.py` → `gauges.py` / `digital.py` / `attitude.py`; rinomina `advance_instr.py`; aggiunto `comfort_instr.py` |
-| Catalogo | Aggiunti Turn Coordinator, AttitudeAdvance, 5 strumenti Comfort; rimosso stile Clean |
+| Temi | Il tema gestisce solo scena e selezione. I colori degli strumenti sono costanti interne a ogni classe. |
+| Struttura | Split `specific.py` → `gauges.py` / `digital.py` / `attitude.py`; rinomina `advance_instr.py`; aggiunto `comfort_instr.py`; aggiunto `view_instr.py` e `viewport.py` |
+| Catalogo | Aggiunti Turn Coordinator, AttitudeAdvance, PFD, 5 strumenti Comfort, Viewport, Tape (airspeed/altimeter/heading); rimosso stile Clean |
 | Mixin | Nuova sezione dedicata (`UnitButtonsMixin`, `TurnTargetMixin`, `ColorSelectorMixin`) |
-| Unità | Contratto SI; aggiunto FT/SEC; default SI; helper `unit_index` |
-| Persistenza | Ora salva unità, target, palette, tema; nuovo campo `state` e `theme_id` |
-| Telemetria | Aggiunto campo `turn_rate`. `ExternalTelemetryAdapter.push_data()` è ora thread-safe. |
-| Correzioni | Rimuovo try/except globale in PFD; serializzazione unità PFD; fix modulo in `_cycle_palette`; licenza MIT |
-| Prossimi passi | Rimosso Clean in favore di Minimal; aggiornate priorità |
+| Unità | Contratto SI; aggiunto FT/SEC; default SI; helper `unit_index`; lookup su `unit_id` (non più su `label`) |
+| Persistenza | Ora salva unità, target, palette, tema; nuovo campo `state` e `theme_id`; serializzazione unità PFD |
+| Telemetria | Aggiunto campo `turn_rate`. `ExternalTelemetryAdapter.push_data()` è ora thread-safe (`QTimer.singleShot`). |
+| Hangar | Fix QPainter al click in modalità lista; icone rimosse/ripristinate nel toggle; drag usa cache del dock |
+| Correzioni | Rimosso try/except globale in PFD; fix modulo in `_cycle_palette`; licenza MIT; `main.py` ripulito; costanti e import ridondanti rimossi |
+| Prossimi passi | Rimosso Clean in favore di Minimal; aggiunti snapping avanzato, fix z-order, roadmap funzionalità |
 
 ---
 
