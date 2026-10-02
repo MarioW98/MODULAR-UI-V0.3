@@ -26,10 +26,17 @@ class AirspeedTape(UnitButtonsMixin, BaseInstrument):
         "M/S":   (2.5, 5.0),
     }
 
+    _TAPE_STEPS = {
+        "kt":  (5.0, 10.0),
+        "kmh": (10.0, 20.0),
+        "mph": (5.0, 10.0),
+        "ms":  (2.5, 5.0),
+    }
+
     def _tape_steps(self):
         u = self.current_unit()
-        label = u.label if u else "KNOTS"
-        return self._TAPE_STEPS.get(label, (5.0, 10.0))
+        uid = u.unit_id if u else "ms"
+        return self._TAPE_STEPS.get(uid, (5.0, 10.0))
 
     def __init__(self, prototype, parent=None):
         super().__init__(prototype, parent)
