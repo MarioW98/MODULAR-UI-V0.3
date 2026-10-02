@@ -78,7 +78,7 @@ class HangarDockWidget(QDockWidget):
         layout.addLayout(filter_row)
 
         # --- Lista strumenti ---
-        self._list = InstrumentList()
+        self._list = InstrumentList(dock=self)
         self._list.setDragEnabled(True)
         self._list.itemDoubleClicked.connect(self._on_double_click)
 
@@ -284,6 +284,11 @@ class HangarDockWidget(QDockWidget):
 class InstrumentList(QListWidget):
     """QListWidget che supporta il drag degli strumenti verso la scena."""
 
+    def __init__(self, dock=None, parent=None):
+        super().__init__(parent)
+        self._dock = dock
+
+
     def startDrag(self, supportedActions):
         item = self.currentItem()
         if item is None:
@@ -298,12 +303,24 @@ class InstrumentList(QListWidget):
         drag = QDrag(self)
         drag.setMimeData(mime)
 
-        # Usa la thumbnail come immagine del drag (solo se valida)
+        # Recupera la pixmap per il drag: prima dall'icona dell'item,
+        # poi dalla cache del dock (necessario in modalità lista dove
+        # le icone sono rimosse)
+        pixmap = None
         icon = item.icon()
         if icon and not icon.isNull():
             pixmap = icon.pixmap(48, 48)
-            if not pixmap.isNull() and pixmap.width() > 0 and pixmap.height() > 0:
-                drag.setPixmap(pixmap)
+
+        if pixmap is None or pixmap.isNull():
+            if self._dock is not None:
+                pixmap = self._dock._get_thumbnail(proto)
+
+        if pixmap is not None and not pixmap.isNull() \
+                and pixmap.width() > 0 and pixmap.height() > 0:
+            drag.setPixmap(pixmap)
 
         drag.exec(Qt.DropAction.CopyAction)
+
+
+
 
