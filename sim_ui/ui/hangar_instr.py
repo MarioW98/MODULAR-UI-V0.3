@@ -212,7 +212,9 @@ class HangarDockWidget(QDockWidget):
             self._list.setSpacing(1)
             self._view_toggle.setText("⊞")
             self._view_toggle.setToolTip("Passa alla vista miniature")
-
+            for i in range(self._list.count()):
+                item = self._list.item(i)
+                item.setIcon(QIcon())
     # =========================================================================
     # FILTRI (ricerca + stile)
     # =========================================================================
