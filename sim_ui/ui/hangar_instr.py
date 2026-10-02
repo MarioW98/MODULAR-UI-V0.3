@@ -203,18 +203,37 @@ class HangarDockWidget(QDockWidget):
     def _toggle_view_mode(self, use_thumbnails: bool):
         """Alterna tra vista miniature e lista semplice."""
         if use_thumbnails:
-            self._list.setIconSize(QSize(40,40))
+            # Ripristina le icone dalla cache PRIMA di cambiare iconSize
+            for i in range(self._list.count()):
+                item = self._list.item(i)
+                proto = item.data(Qt.ItemDataRole.UserRole)
+                if proto is not None:
+                    thumb = self._get_thumbnail(proto)
+                    if thumb is not None and not thumb.isNull():
+                        item.setIcon(QIcon(thumb))
+
+            self._list.setIconSize(QSize(52, 52))
             self._list.setSpacing(4)
             self._view_toggle.setText("☰")
             self._view_toggle.setToolTip("Passa alla vista lista")
         else:
+            # Rimuovi le icone per evitare il pallino
+            for i in range(self._list.count()):
+                item = self._list.item(i)
+                item.setIcon(QIcon())
+
             self._list.setIconSize(QSize(1, 1))
             self._list.setSpacing(1)
             self._view_toggle.setText("⊞")
             self._view_toggle.setToolTip("Passa alla vista miniature")
-            for i in range(self._list.count()):
-                item = self._list.item(i)
-                item.setIcon(QIcon())
+
+        # Forza il repaint completo della lista
+        self._list.viewport().update()
+
+
+
+
+
     # =========================================================================
     # FILTRI (ricerca + stile)
     # =========================================================================
