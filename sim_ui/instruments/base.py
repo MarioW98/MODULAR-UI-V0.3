@@ -50,12 +50,18 @@ class BaseInstrument(QGraphicsObject):
     def _render_bg(self):
         w, h = int(self._prototype.width), int(self._prototype.height)
         px = QPixmap(w, h)
+        if px.isNull():
+            return
         px.fill(Qt.GlobalColor.transparent)
         p = QPainter(px)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        self.paint_background(p)
-        p.end()
+        if not p.isActive():
+            return
+        try:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+            self.paint_background(p)
+        finally:
+            p.end()
         self._bg_cache = px
 
     def paint(self, painter, option, widget=None):

@@ -81,6 +81,7 @@ class HangarDockWidget(QDockWidget):
         self._list = InstrumentList()
         self._list.setDragEnabled(True)
         self._list.itemDoubleClicked.connect(self._on_double_click)
+
         layout.addWidget(self._list)
 
         self.setWidget(container)
@@ -124,8 +125,12 @@ class HangarDockWidget(QDockWidget):
                 item.setData(Qt.ItemDataRole.UserRole, proto)
                 item.setToolTip(proto.description)
                 thumb = self._get_thumbnail(proto)
-                if thumb:
-                    item.setIcon(QIcon(thumb))
+                if thumb is not None and not thumb.isNull() and thumb.width() > 0 and thumb.height() > 0:
+                    # Crea una copia esplicita della pixmap per evitare problemi
+                    # di ciclo di vita con PySide6
+                    icon_pixmap = QPixmap(thumb)
+                    if not icon_pixmap.isNull():
+                        item.setIcon(QIcon(icon_pixmap))
                 self._list.addItem(item)
 
     # =========================================================================
@@ -143,6 +148,7 @@ class HangarDockWidget(QDockWidget):
 
     def _render_thumbnail(self, proto, target: int = 48) -> QPixmap | None:
         """Renderizza lo strumento in una QPixmap ridotta."""
+        item = None
         try:
             item = InstrumentFactory.create_item(proto)
 
@@ -155,19 +161,38 @@ class HangarDockWidget(QDockWidget):
                 item.update_data(TelemetryData())
 
             w, h = int(proto.width), int(proto.height)
+            if w <= 0 or h <= 0:
+                return None
+
+            # Forza la cache di sfondo PRIMA di creare il painter esterno
+            if hasattr(item, "_render_bg") and getattr(item, "_bg_cache", None) is None:
+                item._render_bg()
+
             canvas = QPixmap(w, h)
+            if canvas.isNull():
+                return None
+
             canvas.fill(Qt.GlobalColor.transparent)
 
             painter = QPainter(canvas)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-            option = QStyleOptionGraphicsItem()
-            item.paint(painter, option, None)
-            painter.end()
+            if not painter.isActive():
+                return None
 
-            return canvas.scaled(target, target,
-                                 Qt.AspectRatioMode.KeepAspectRatio,
-                                 Qt.TransformationMode.SmoothTransformation)
+            try:
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                option = QStyleOptionGraphicsItem()
+                item.paint(painter, option, None)
+                
+            finally:
+                painter.end()  # ← GARANTITO anche se paint() solleva eccezione
+
+            result = canvas.scaled(target, target,
+                                Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation)
+            if result.isNull():
+                return None
+            return result
         except Exception:
             return None
 
@@ -178,12 +203,12 @@ class HangarDockWidget(QDockWidget):
     def _toggle_view_mode(self, use_thumbnails: bool):
         """Alterna tra vista miniature e lista semplice."""
         if use_thumbnails:
-            self._list.setIconSize(QSize(52, 52))
+            self._list.setIconSize(QSize(40,40))
             self._list.setSpacing(4)
             self._view_toggle.setText("☰")
             self._view_toggle.setToolTip("Passa alla vista lista")
         else:
-            self._list.setIconSize(QSize(0, 0))
+            self._list.setIconSize(QSize(1, 1))
             self._list.setSpacing(1)
             self._view_toggle.setText("⊞")
             self._view_toggle.setToolTip("Passa alla vista miniature")
@@ -253,6 +278,7 @@ class HangarDockWidget(QDockWidget):
         self.instrument_requested.emit(proto.type_id)
 
 
+
 class InstrumentList(QListWidget):
     """QListWidget che supporta il drag degli strumenti verso la scena."""
 
@@ -270,9 +296,12 @@ class InstrumentList(QListWidget):
         drag = QDrag(self)
         drag.setMimeData(mime)
 
-        # Usa la thumbnail come immagine del drag
+        # Usa la thumbnail come immagine del drag (solo se valida)
         icon = item.icon()
         if icon and not icon.isNull():
-            drag.setPixmap(icon.pixmap(48, 48))
+            pixmap = icon.pixmap(48, 48)
+            if not pixmap.isNull() and pixmap.width() > 0 and pixmap.height() > 0:
+                drag.setPixmap(pixmap)
 
         drag.exec(Qt.DropAction.CopyAction)
+
